@@ -6,6 +6,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { formatCurrency } from "@/lib/utils";
 import { getStockStatus, STOCK_STATUS_LABEL, STOCK_STATUS_TONE } from "@/lib/stock-status";
+import { ProductImport } from "@/components/products/product-import";
+import { SpreadsheetExportButtons } from "@/components/ui/spreadsheet-export-buttons";
 
 const PRODUCT_TYPES = ["FINISHED_PRODUCT", "RAW_MATERIAL", "COMPONENT"] as const;
 
@@ -30,7 +32,7 @@ export default async function ProductsPage({
 }) {
   const { q, category, type, stockStatus, status } = await searchParams;
 
-  const [products, categories] = await Promise.all([
+  const [products, categories, productSkus] = await Promise.all([
     prisma.product.findMany({
       where: {
         status: status === "ARCHIVED" ? "ARCHIVED" : status === "ALL" ? undefined : "ACTIVE",
@@ -50,6 +52,7 @@ export default async function ProductsPage({
       include: { category: { select: { name: true } } },
     }),
     prisma.category.findMany({ where: { status: "ACTIVE" }, orderBy: { name: "asc" } }),
+    prisma.product.findMany({ where: { sku: { not: null } }, select: { sku: true } }),
   ]);
 
   const filtered = stockStatus
@@ -62,12 +65,33 @@ export default async function ProductsPage({
         title="Products"
         description="Add, edit, search, and organize every product Softoi sells."
         actions={
-          <Link
-            href="/products/new"
-            className="flex items-center gap-2 rounded-md bg-brand px-4 py-2.5 text-sm font-medium text-white hover:opacity-90"
-          >
-            <Plus size={16} /> Add Product
-          </Link>
+          <>
+            <ProductImport
+              categories={categories.map((category) => ({ id: category.id, name: category.name }))}
+              existingSkus={productSkus.flatMap((product) => (product.sku ? [product.sku] : []))}
+            />
+            <SpreadsheetExportButtons
+              filename="products"
+              rows={filtered.map((product) => ({
+                "Product Code": product.productCode,
+                "Product Name": product.name,
+                SKU: product.sku,
+                Category: product.category?.name ?? "",
+                "Product Type": typeLabel(product.productType),
+                "Current Stock": product.currentStock,
+                "Minimum Stock": product.minimumStock,
+                "Cost Price": product.costPrice?.toString() ?? "",
+                "Selling Price": product.sellingPrice?.toString() ?? "",
+                Status: product.status === "ACTIVE" ? "Active" : "Archived",
+              }))}
+            />
+            <Link
+              href="/products/new"
+              className="flex items-center gap-2 rounded-md bg-brand px-4 py-2.5 text-sm font-medium text-white hover:opacity-90"
+            >
+              <Plus size={16} /> Add Product
+            </Link>
+          </>
         }
       />
 

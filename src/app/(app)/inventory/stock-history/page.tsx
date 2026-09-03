@@ -2,6 +2,7 @@ import { History } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { SpreadsheetExportButtons } from "@/components/ui/spreadsheet-export-buttons";
 
 const MOVEMENT_TYPES = [
   "INITIAL_STOCK",
@@ -62,6 +63,17 @@ export default async function StockHistoryPage({
       <PageHeader
         title="Stock History"
         description="A complete, permanent record of every stock movement."
+        actions={<SpreadsheetExportButtons filename="stock-history" rows={movements.map((movement) => ({
+          Date: movement.movementDate.toISOString(),
+          Product: movement.product.name,
+          Type: movementLabel(movement.movementType),
+          Quantity: movement.quantity,
+          "Previous Quantity": movement.previousQuantity,
+          "New Quantity": movement.newQuantity,
+          Reason: movement.reason,
+          Notes: movement.notes,
+          "Created By": movement.createdBy?.name ?? "",
+        }))} />}
       />
 
       <form className="mb-4 flex flex-wrap gap-2">

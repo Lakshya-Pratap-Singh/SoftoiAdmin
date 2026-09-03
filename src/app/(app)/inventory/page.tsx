@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { getStockStatus, STOCK_STATUS_LABEL, STOCK_STATUS_TONE } from "@/lib/stock-status";
+import { SpreadsheetExportButtons } from "@/components/ui/spreadsheet-export-buttons";
 
 export default async function InventoryPage({
   searchParams,
@@ -35,6 +36,15 @@ export default async function InventoryPage({
       <PageHeader
         title="Inventory"
         description="A central view of current stock across every product."
+        actions={<SpreadsheetExportButtons filename="inventory" rows={products.map((product) => ({
+          "Product Code": product.productCode,
+          "Product Name": product.name,
+          SKU: product.sku,
+          Category: product.category?.name ?? "",
+          "Current Stock": product.currentStock,
+          "Minimum Stock": product.minimumStock,
+          "Stock Status": STOCK_STATUS_LABEL[getStockStatus(product.currentStock, product.minimumStock)],
+        }))} />}
       />
 
       <form className="mb-4">
