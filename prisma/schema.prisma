@@ -1,0 +1,321 @@
+// Softoi Admin — Prisma schema
+// Central data model for products, inventory, orders, POS, and stalls/events.
+// Design notes:
+// - Nothing is hard-deleted (products/categories/stalls use `status`); stock
+//   history is append-only and never deleted or edited.
+// - Every inventory change must produce a StockMovement row — enforced in
+//   application code inside a DB transaction, not at the schema level.
+// - `reference_type` / `reference_id` on StockMovement loosely link back to
+//   whatever triggered the movement (an Order, a manual adjustment, etc.)
+//   without a hard FK, so new movement sources can be added later without
+//   a schema migration.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// ENUMS
+// ---------------------------------------------------------------------------
+
+enum UserRole {
+  ADMIN
+  INVENTORY_MANAGER
+  STAFF
+  STALL_MANAGER
+}
+
+enum ProductType {
+  FINISHED_PRODUCT
+  RAW_MATERIAL
+  COMPONENT
+  VARIANT_PRODUCT // future-ready, not exposed in V1 UI
+  COMBO_PRODUCT // future-ready, not exposed in V1 UI
+}
+
+enum RecordStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum StockMovementType {
+  INITIAL_STOCK
+  STOCK_IN
+  STOCK_OUT
+  STOCK_ADJUSTMENT
+  POS_SALE
+  ONLINE_ORDER
+  ORDER_CANCELLATION
+  STOCK_RESTORATION
+}
+
+enum StallStatus {
+  UPCOMING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum SalesChannel {
+  WEBSITE
+  OFFLINE_STALL
+  MALL
+  EXHIBITION
+  POPUP_STORE
+  INSTAGRAM
+  MANUAL_ORDER
+  OTHER
+}
+
+enum OrderStatus {
+  DRAFT
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  PARTIALLY_PAID
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CASH
+  UPI
+  CARD
+  OTHER
+}
+
+// ---------------------------------------------------------------------------
+// USERS
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  passwordHash  String
+  role          UserRole  @default(ADMIN)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  stockMovements StockMovement[] @relation("StockMovementCreatedBy")
+  orders         Order[]         @relation("OrderCreatedBy")
+
+  @@map("users")
+}
+
+// ---------------------------------------------------------------------------
+// CATEGORIES
+// ---------------------------------------------------------------------------
+
+model Category {
+  id          String       @id @default(cuid())
+  name        String
+  description String?
+  status      RecordStatus @default(ACTIVE)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  products Product[]
+
+  @@map("categories")
+}
+
+// ---------------------------------------------------------------------------
+// PRODUCTS
+// ---------------------------------------------------------------------------
+
+model Product {
+  id             String       @id @default(cuid())
+  productCode    String       @unique // e.g. SOF-0001, auto-generated
+  name           String
+  sku            String?      @unique
+  categoryId     String?
+  category       Category?    @relation(fields: [categoryId], references: [id])
+  productType    ProductType  @default(FINISHED_PRODUCT)
+  description    String?
+  imageUrl       String?
+
+  currentStock   Int          @default(0)
+  minimumStock   Int          @default(0)
+
+  costPrice      Decimal?     @db.Decimal(10, 2)
+  sellingPrice   Decimal?     @db.Decimal(10, 2)
+
+  notes          String?
+  status         RecordStatus @default(ACTIVE)
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  stockMovements StockMovement[]
+  orderItems     OrderItem[]
+
+  @@index([categoryId])
+  @@index([status])
+  @@map("products")
+}
+
+// ---------------------------------------------------------------------------
+// STOCK MOVEMENTS — append-only ledger, never edited or deleted
+// ---------------------------------------------------------------------------
+
+model StockMovement {
+  id               String            @id @default(cuid())
+  productId        String
+  product          Product           @relation(fields: [productId], references: [id])
+
+  movementType     StockMovementType
+  quantity         Int // signed: positive for additions, negative for removals
+  previousQuantity Int
+  newQuantity      Int
+
+  reason           String
+  notes            String?
+
+  // Loose polymorphic reference to whatever caused this movement
+  // (e.g. referenceType: "ORDER", referenceId: order.id).
+  referenceType    String?
+  referenceId      String?
+
+  createdById      String?
+  createdBy        User?             @relation("StockMovementCreatedBy", fields: [createdById], references: [id])
+
+  movementDate     DateTime          @default(now())
+  createdAt        DateTime          @default(now())
+
+  @@index([productId])
+  @@index([movementType])
+  @@index([movementDate])
+  @@map("stock_movements")
+}
+
+// ---------------------------------------------------------------------------
+// CUSTOMERS
+// ---------------------------------------------------------------------------
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String?
+  email     String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders Order[]
+
+  @@map("customers")
+}
+
+// ---------------------------------------------------------------------------
+// STALLS & EVENTS
+// ---------------------------------------------------------------------------
+
+model Stall {
+  id        String      @id @default(cuid())
+  stallCode String      @unique // e.g. STL-0001
+  name      String
+  location  String?
+  mallName  String?
+  eventName String?
+  startDate DateTime?
+  endDate   DateTime?
+  status    StallStatus @default(UPCOMING)
+  notes     String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  orders Order[]
+
+  @@map("stalls")
+}
+
+// ---------------------------------------------------------------------------
+// ORDERS
+// ---------------------------------------------------------------------------
+
+model Order {
+  id            String        @id @default(cuid())
+  orderNumber   String        @unique // e.g. ORD-000001
+
+  customerId    String?
+  customer      Customer?     @relation(fields: [customerId], references: [id])
+
+  salesChannel  SalesChannel
+  stallId       String?
+  stall         Stall?        @relation(fields: [stallId], references: [id])
+
+  status        OrderStatus   @default(DRAFT)
+  paymentStatus PaymentStatus @default(PENDING)
+  paymentMethod PaymentMethod?
+
+  subtotal      Decimal       @db.Decimal(10, 2)
+  discount      Decimal       @default(0) @db.Decimal(10, 2)
+  total         Decimal       @db.Decimal(10, 2)
+
+  notes         String?
+
+  createdById   String?
+  createdBy     User?         @relation("OrderCreatedBy", fields: [createdById], references: [id])
+
+  orderDate     DateTime      @default(now())
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  items OrderItem[]
+
+  @@index([salesChannel])
+  @@index([status])
+  @@index([stallId])
+  @@index([orderDate])
+  @@map("orders")
+}
+
+model OrderItem {
+  id                 String   @id @default(cuid())
+  orderId            String
+  order              Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  productId          String?
+  product            Product? @relation(fields: [productId], references: [id])
+
+  // Snapshots so historical orders stay accurate even if the product changes later
+  productNameSnapshot String
+  skuSnapshot         String?
+
+  quantity           Int
+  unitPrice           Decimal  @db.Decimal(10, 2)
+  discount             Decimal  @default(0) @db.Decimal(10, 2)
+  total                Decimal  @db.Decimal(10, 2)
+
+  createdAt          DateTime @default(now())
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
+}
+
+// ---------------------------------------------------------------------------
+// SETTINGS — single-row table for business/inventory settings
+// ---------------------------------------------------------------------------
+
+model Settings {
+  id                      String   @id @default(cuid())
+  businessName            String   @default("Softoi")
+  businessLogoUrl         String?
+  currency                String   @default("INR")
+  defaultMinimumStock     Int      @default(0)
+  allowNegativeStock      Boolean  @default(false)
+  updatedAt               DateTime @updatedAt
+
+  @@map("settings")
+}
