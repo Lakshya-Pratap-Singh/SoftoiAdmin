@@ -47,7 +47,7 @@ also writes a `StockMovement` row.
    npm run db:seed
    ```
    Creates an admin user from `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` in
-   your `.env` (defaults to `admin@softoi.shop` / `ChangeMe123!` if unset —
+   your `.env` (defaults to `admin@softoi.shop` / `062618' net—
    change the password after first login).
 
 5. **Run the dev server**
