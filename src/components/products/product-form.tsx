@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { Field, TextInput, Select, Textarea, SubmitButton, SecondaryButton } from "@/components/ui/form";
+import { ImageUpload } from "@/components/products/image-upload";
 import type { ActionState } from "@/lib/actions/categories";
 
 type Category = { id: string; name: string };
@@ -30,6 +31,7 @@ export function ProductForm({
   };
 }) {
   const [state, formAction] = useActionState(action, undefined);
+  const [imageUrl, setImageUrl] = useState(defaults?.imageUrl ?? "");
 
   return (
     <form action={formAction} className="flex flex-col gap-8">
@@ -64,11 +66,19 @@ export function ProductForm({
               <option value="COMPONENT">Component</option>
             </Select>
           </Field>
-          <Field label="Product image URL" htmlFor="imageUrl" hint="Paste a hosted image link">
-            <TextInput id="imageUrl" name="imageUrl" defaultValue={defaults?.imageUrl} placeholder="https://…" />
-          </Field>
         </div>
-        <div className="mt-4">
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <Field label="Product image" htmlFor="imageUrl" hint="Upload a photo, or paste a hosted image link below">
+            <ImageUpload value={imageUrl} onChange={setImageUrl} />
+            <TextInput
+              id="imageUrl"
+              name="imageUrl"
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              placeholder="https://…"
+              className="mt-2"
+            />
+          </Field>
           <Field label="Description" htmlFor="description">
             <Textarea id="description" name="description" rows={3} defaultValue={defaults?.description} />
           </Field>
