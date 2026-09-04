@@ -14,6 +14,12 @@ type PosProduct = {
   currentStock: number;
   sellingPrice: string | null;
   imageUrl: string | null;
+  categoryId: string | null;
+};
+
+type PosCategory = {
+  id: string;
+  name: string;
 };
 
 type CartLine = {
@@ -30,11 +36,14 @@ const PAYMENT_METHODS = ["CASH", "UPI", "CARD", "OTHER"];
 export function PosScreen({
   products,
   stalls,
+  categories,
 }: {
   products: PosProduct[];
   stalls: { id: string; name: string }[];
+  categories: PosCategory[];
 }) {
   const [query, setQuery] = useState("");
+  const [categoryId, setCategoryId] = useState<string | null>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [orderDiscount, setOrderDiscount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState("CASH");
@@ -45,16 +54,22 @@ export function PosScreen({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return products.slice(0, 24);
-    return products
-      .filter(
-        (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.productCode.toLowerCase().includes(q) ||
-          (p.sku ?? "").toLowerCase().includes(q)
-      )
-      .slice(0, 24);
-  }, [products, query]);
+    const byCategory = categoryId ? products.filter((p) => p.categoryId === categoryId) : products;
+
+    if (!q) {
+      // Browsing with no search term: cap the list only in the "All
+      // categories" view, so the initial screen isn't overwhelming.
+      // Picking a specific category means showing everything in it.
+      return categoryId ? byCategory : byCategory.slice(0, 24);
+    }
+
+    return byCategory.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        p.productCode.toLowerCase().includes(q) ||
+        (p.sku ?? "").toLowerCase().includes(q)
+    );
+  }, [products, query, categoryId]);
 
   function addToCart(p: PosProduct) {
     if (p.currentStock <= 0) return;
@@ -128,30 +143,69 @@ export function PosScreen({
             className="w-full rounded-md border border-border bg-surface py-3 pl-9 pr-3.5 text-[15px] text-ink outline-none focus:border-brand"
           />
         </div>
-        <div className="grid flex-1 grid-cols-2 gap-3 overflow-y-auto pb-2 sm:grid-cols-3 xl:grid-cols-4">
-          {filtered.map((p) => {
-            const outOfStock = p.currentStock <= 0;
-            return (
+
+        {categories.length > 0 && (
+          <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+            <button
+              type="button"
+              onClick={() => setCategoryId(null)}
+              className={cn(
+                "shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors",
+                categoryId === null
+                  ? "border-brand bg-brand text-white"
+                  : "border-border bg-surface text-ink-muted hover:border-brand"
+              )}
+            >
+              All
+            </button>
+            {categories.map((c) => (
               <button
-                key={p.id}
+                key={c.id}
                 type="button"
-                disabled={outOfStock}
-                onClick={() => addToCart(p)}
+                onClick={() => setCategoryId(c.id)}
                 className={cn(
-                  "flex flex-col items-start gap-1 rounded-lg border border-border bg-surface p-3 text-left transition-colors",
-                  outOfStock ? "cursor-not-allowed opacity-50" : "hover:border-brand"
+                  "shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors",
+                  categoryId === c.id
+                    ? "border-brand bg-brand text-white"
+                    : "border-border bg-surface text-ink-muted hover:border-brand"
                 )}
               >
-                <ProductAvatar src={p.imageUrl} alt={p.name} size={44} rounded="md" className="mb-1" />
-                <p className="line-clamp-2 text-sm font-medium text-ink">{p.name}</p>
-                <p className="text-xs text-ink-faint">{p.currentStock} in stock</p>
-                <p className="mt-auto pt-1 text-sm font-semibold text-brand">
-                  {p.sellingPrice ? formatCurrency(p.sellingPrice) : "—"}
-                </p>
+                {c.name}
               </button>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        )}
+
+        {filtered.length === 0 ? (
+          <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-border p-8 text-center text-sm text-ink-faint">
+            No products match{categoryId ? " this category" : " your search"}.
+          </div>
+        ) : (
+          <div className="grid flex-1 grid-cols-2 gap-3 overflow-y-auto pb-2 sm:grid-cols-3 xl:grid-cols-4">
+            {filtered.map((p) => {
+              const outOfStock = p.currentStock <= 0;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  disabled={outOfStock}
+                  onClick={() => addToCart(p)}
+                  className={cn(
+                    "flex flex-col items-start gap-1 rounded-lg border border-border bg-surface p-3 text-left transition-colors",
+                    outOfStock ? "cursor-not-allowed opacity-50" : "hover:border-brand"
+                  )}
+                >
+                  <ProductAvatar src={p.imageUrl} alt={p.name} size={44} rounded="md" className="mb-1" />
+                  <p className="line-clamp-2 text-sm font-medium text-ink">{p.name}</p>
+                  <p className="text-xs text-ink-faint">{p.currentStock} in stock</p>
+                  <p className="mt-auto pt-1 text-sm font-semibold text-brand">
+                    {p.sellingPrice ? formatCurrency(p.sellingPrice) : "—"}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Cart */}

@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { PosScreen } from "@/components/pos/pos-screen";
 
 export default async function PosPage() {
-  const [products, stalls] = await Promise.all([
+  const [products, stalls, categories] = await Promise.all([
     prisma.product.findMany({
       where: { status: "ACTIVE" },
       orderBy: { name: "asc" },
@@ -14,9 +14,15 @@ export default async function PosPage() {
         currentStock: true,
         sellingPrice: true,
         imageUrl: true,
+        categoryId: true,
       },
     }),
     prisma.stall.findMany({
+      where: { status: "ACTIVE" },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+    prisma.category.findMany({
       where: { status: "ACTIVE" },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
@@ -28,5 +34,5 @@ export default async function PosPage() {
     sellingPrice: p.sellingPrice?.toString() ?? null,
   }));
 
-  return <PosScreen products={productsForClient} stalls={stalls} />;
+  return <PosScreen products={productsForClient} stalls={stalls} categories={categories} />;
 }
