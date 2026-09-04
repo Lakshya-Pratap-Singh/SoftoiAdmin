@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { formatCurrency } from "@/lib/utils";
 import { getStockStatus, STOCK_STATUS_LABEL, STOCK_STATUS_TONE } from "@/lib/stock-status";
 import { archiveProduct, restoreProduct } from "@/lib/actions/products";
+import { ProductAvatar } from "@/components/ui/product-avatar";
 
 function typeLabel(type: string) {
   return type.toLowerCase().split("_").map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
@@ -27,7 +28,10 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div>
-      <PageHeader
+      <div className="flex items-start gap-4">
+        <ProductAvatar src={product.imageUrl} alt={product.name} size={64} rounded="md" />
+        <div className="flex-1">
+          <PageHeader
         title={product.name}
         description={`${product.productCode}${product.sku ? ` · ${product.sku}` : ""}`}
         actions={
@@ -60,6 +64,8 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
           </>
         }
       />
+        </div>
+      </div>
 
       <div className="flex flex-wrap gap-2">
         <Link href="/inventory/stock-in" className="flex items-center gap-2 rounded-md bg-brand px-4 py-2.5 text-sm font-medium text-white hover:opacity-90">

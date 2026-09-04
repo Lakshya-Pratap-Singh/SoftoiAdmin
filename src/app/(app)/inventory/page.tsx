@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { getStockStatus, STOCK_STATUS_LABEL, STOCK_STATUS_TONE } from "@/lib/stock-status";
 import { SpreadsheetExportButtons } from "@/components/ui/spreadsheet-export-buttons";
+import { ProductAvatar } from "@/components/ui/product-avatar";
 
 export default async function InventoryPage({
   searchParams,
@@ -82,7 +83,8 @@ export default async function InventoryPage({
                 return (
                   <tr key={p.id}>
                     <td className="px-4 py-3">
-                      <Link href={`/products/${p.id}`} className="font-medium text-ink hover:text-brand">
+                      <Link href={`/products/${p.id}`} className="flex items-center gap-3 font-medium text-ink hover:text-brand">
+                        <ProductAvatar src={p.imageUrl} alt={p.name} size={32} />
                         {p.name}
                       </Link>
                     </td>

@@ -8,6 +8,7 @@ import { formatCurrency } from "@/lib/utils";
 import { getStockStatus, STOCK_STATUS_LABEL, STOCK_STATUS_TONE } from "@/lib/stock-status";
 import { ProductImport } from "@/components/products/product-import";
 import { SpreadsheetExportButtons } from "@/components/ui/spreadsheet-export-buttons";
+import { ProductAvatar } from "@/components/ui/product-avatar";
 
 const PRODUCT_TYPES = ["FINISHED_PRODUCT", "RAW_MATERIAL", "COMPONENT"] as const;
 
@@ -181,7 +182,8 @@ export default async function ProductsPage({
                 return (
                   <tr key={p.id}>
                     <td className="px-4 py-3">
-                      <Link href={`/products/${p.id}`} className="font-medium text-ink hover:text-brand">
+                      <Link href={`/products/${p.id}`} className="flex items-center gap-3 font-medium text-ink hover:text-brand">
+                        <ProductAvatar src={p.imageUrl} alt={p.name} size={32} />
                         {p.name}
                       </Link>
                     </td>

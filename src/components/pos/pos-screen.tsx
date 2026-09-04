@@ -4,6 +4,7 @@ import { useMemo, useState, useActionState } from "react";
 import { Search, Plus, Minus, Trash2, ShoppingCart } from "lucide-react";
 import { formatCurrency, cn } from "@/lib/utils";
 import { createOrder } from "@/lib/actions/orders";
+import { ProductAvatar } from "@/components/ui/product-avatar";
 
 type PosProduct = {
   id: string;
@@ -141,6 +142,7 @@ export function PosScreen({
                   outOfStock ? "cursor-not-allowed opacity-50" : "hover:border-brand"
                 )}
               >
+                <ProductAvatar src={p.imageUrl} alt={p.name} size={44} rounded="md" className="mb-1" />
                 <p className="line-clamp-2 text-sm font-medium text-ink">{p.name}</p>
                 <p className="text-xs text-ink-faint">{p.currentStock} in stock</p>
                 <p className="mt-auto pt-1 text-sm font-semibold text-brand">

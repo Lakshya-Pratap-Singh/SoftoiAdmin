@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Search, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ProductAvatar } from "@/components/ui/product-avatar";
 
 export type PickableProduct = {
   id: string;
@@ -11,6 +12,7 @@ export type PickableProduct = {
   productCode: string;
   currentStock: number;
   sellingPrice: string | null;
+  imageUrl?: string | null;
 };
 
 export function ProductCombobox({
@@ -85,11 +87,14 @@ export function ProductCombobox({
                 selected?.id === p.id && "bg-brand-tint"
               )}
             >
-              <span>
-                <span className="font-medium text-ink">{p.name}</span>
-                <span className="ml-2 text-xs text-ink-faint">
-                  {p.productCode}
-                  {p.sku ? ` · ${p.sku}` : ""}
+              <span className="flex items-center gap-3">
+                <ProductAvatar src={p.imageUrl} alt={p.name} size={28} />
+                <span>
+                  <span className="font-medium text-ink">{p.name}</span>
+                  <span className="ml-2 text-xs text-ink-faint">
+                    {p.productCode}
+                    {p.sku ? ` · ${p.sku}` : ""}
+                  </span>
                 </span>
               </span>
               <span className="flex items-center gap-2 text-xs text-ink-muted">

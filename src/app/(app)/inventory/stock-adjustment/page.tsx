@@ -6,7 +6,7 @@ export default async function StockAdjustmentPage() {
   const products = await prisma.product.findMany({
     where: { status: "ACTIVE" },
     orderBy: { name: "asc" },
-    select: { id: true, name: true, sku: true, productCode: true, currentStock: true, sellingPrice: true },
+    select: { id: true, name: true, sku: true, productCode: true, currentStock: true, sellingPrice: true, imageUrl: true },
   });
 
   const productsForClient = products.map((p) => ({

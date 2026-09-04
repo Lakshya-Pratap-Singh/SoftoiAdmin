@@ -1,12 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui/card";
-import { StockOutForm } from "@/components/inventory/stock-out-form";
+import { StockAdjustmentForm } from "@/components/inventory/stock-adjustment-form";
 
-export default async function StockOutPage() {
+export default async function StockAdjustmentPage() {
   const products = await prisma.product.findMany({
     where: { status: "ACTIVE" },
     orderBy: { name: "asc" },
-    select: { id: true, name: true, sku: true, productCode: true, currentStock: true, sellingPrice: true },
+    select: { id: true, name: true, sku: true, productCode: true, currentStock: true, sellingPrice: true, imageUrl: true },
   });
 
   const productsForClient = products.map((p) => ({
@@ -16,9 +16,12 @@ export default async function StockOutPage() {
 
   return (
     <div>
-      <PageHeader title="Stock Out" description="Remove stock for sales, damage, samples, or personal use." />
+      <PageHeader
+        title="Stock Adjustment"
+        description="Correct system stock to match a physical count."
+      />
       <div className="max-w-xl rounded-lg border border-border bg-surface p-6">
-        <StockOutForm products={productsForClient} />
+        <StockAdjustmentForm products={productsForClient} />
       </div>
     </div>
   );
