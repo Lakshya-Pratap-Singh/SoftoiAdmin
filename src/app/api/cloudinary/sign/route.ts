@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { cloudinary, CLOUDINARY_PRODUCT_FOLDER } from "@/lib/cloudinary";
+import {
+  cloudinary,
+  CLOUDINARY_PRODUCT_FOLDER,
+  CLOUDINARY_CLOUD_NAME,
+  CLOUDINARY_API_KEY,
+  CLOUDINARY_API_SECRET,
+} from "@/lib/cloudinary";
 
 // Issues a short-lived signature so the browser can upload directly to
 // Cloudinary without ever seeing the API secret. Only logged-in admins
@@ -12,18 +18,14 @@ export async function POST() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (
-      !process.env.CLOUDINARY_CLOUD_NAME ||
-      !process.env.CLOUDINARY_API_KEY ||
-      !process.env.CLOUDINARY_API_SECRET
-    ) {
+    if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) {
       return NextResponse.json(
         {
           error: "Cloudinary is not configured on the server.",
           missing: {
-            CLOUDINARY_CLOUD_NAME: !process.env.CLOUDINARY_CLOUD_NAME,
-            CLOUDINARY_API_KEY: !process.env.CLOUDINARY_API_KEY,
-            CLOUDINARY_API_SECRET: !process.env.CLOUDINARY_API_SECRET,
+            CLOUDINARY_CLOUD_NAME: !CLOUDINARY_CLOUD_NAME,
+            CLOUDINARY_API_KEY: !CLOUDINARY_API_KEY,
+            CLOUDINARY_API_SECRET: !CLOUDINARY_API_SECRET,
           },
         },
         { status: 500 }
@@ -37,15 +39,15 @@ export async function POST() {
     // upload request, so keep this in sync with the client's formData.
     const signature = cloudinary.utils.api_sign_request(
       { timestamp, folder },
-      process.env.CLOUDINARY_API_SECRET
+      CLOUDINARY_API_SECRET
     );
 
     return NextResponse.json({
       signature,
       timestamp,
       folder,
-      apiKey: process.env.CLOUDINARY_API_KEY,
-      cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+      apiKey: CLOUDINARY_API_KEY,
+      cloudName: CLOUDINARY_CLOUD_NAME,
     });
   } catch (err) {
     // Surface the real error instead of a bare 500 so this is diagnosable
