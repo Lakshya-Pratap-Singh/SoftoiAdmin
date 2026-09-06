@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { generateOrderNumber } from "@/lib/id-generators";
 import type { ActionState } from "@/lib/actions/categories";
@@ -40,101 +41,132 @@ export async function createOrder(
   const settings = await prisma.settings.findFirst();
   const allowNegative = settings?.allowNegativeStock ?? false;
 
+  // orderNumber is generated from a simple count() and is a unique column.
+  // Two sales completed close together (e.g. a double-tap on "Complete
+  // Sale") can both read the same count before either commits, so the
+  // second one collides. Retry a few times with a fresh count rather than
+  // failing the whole sale on what's usually just a timing collision.
+  const MAX_ATTEMPTS = 5;
+
   try {
-    const order = await prisma.$transaction(async (tx) => {
-      const products = await tx.product.findMany({
-        where: { id: { in: items.map((i) => i.productId) } },
-      });
-      const productMap = new Map(products.map((p) => [p.id, p]));
+    let order: Awaited<ReturnType<typeof prisma.order.create>> | undefined;
 
-      // Validate stock for every line before making any changes
-      for (const item of items) {
-        const product = productMap.get(item.productId);
-        if (!product) throw new Error(`Product not found.`);
-        if (!allowNegative && item.quantity > product.currentStock) {
-          throw new Error(`Insufficient stock for ${product.name}.`);
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        order = await prisma.$transaction(async (tx) => {
+          const products = await tx.product.findMany({
+            where: { id: { in: items.map((i) => i.productId) } },
+          });
+          const productMap = new Map(products.map((p) => [p.id, p]));
+
+          // Validate stock for every line before making any changes
+          for (const item of items) {
+            const product = productMap.get(item.productId);
+            if (!product) throw new Error(`Product not found.`);
+            if (!allowNegative && item.quantity > product.currentStock) {
+              throw new Error(`Insufficient stock for ${product.name}.`);
+            }
+          }
+
+          const subtotal = items.reduce(
+            (sum, i) => sum + i.unitPrice * i.quantity - i.discount,
+            0
+          );
+          const total = Math.max(subtotal - orderDiscount, 0);
+
+          let customerId: string | null = null;
+          if (customerName) {
+            const customer = await tx.customer.create({
+              data: {
+                name: customerName,
+                phone: customerPhone || null,
+                email: customerEmail || null,
+              },
+            });
+            customerId = customer.id;
+          }
+
+          const orderNumber = await generateOrderNumber();
+          const createdOrder = await tx.order.create({
+            data: {
+              orderNumber,
+              customerId,
+              salesChannel: salesChannel as never,
+              stallId: stallId || null,
+              status: "COMPLETED",
+              paymentStatus: "PAID",
+              paymentMethod: paymentMethod as never,
+              subtotal,
+              discount: orderDiscount,
+              total,
+              notes: notes || null,
+            },
+          });
+
+          for (const item of items) {
+            const product = productMap.get(item.productId)!;
+            const itemTotal = item.unitPrice * item.quantity - item.discount;
+
+            await tx.orderItem.create({
+              data: {
+                orderId: createdOrder.id,
+                productId: product.id,
+                productNameSnapshot: product.name,
+                skuSnapshot: product.sku,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                discount: item.discount,
+                total: itemTotal,
+              },
+            });
+
+            const previousQuantity = product.currentStock;
+            const newQuantity = previousQuantity - item.quantity;
+
+            await tx.product.update({
+              where: { id: product.id },
+              data: { currentStock: newQuantity },
+            });
+
+            await tx.stockMovement.create({
+              data: {
+                productId: product.id,
+                movementType: "POS_SALE",
+                quantity: -item.quantity,
+                previousQuantity,
+                newQuantity,
+                reason: "POS Sale",
+                referenceType: "ORDER",
+                referenceId: createdOrder.id,
+              },
+            });
+
+            // Keep productMap in sync in case the same product appears twice in the cart
+            productMap.set(product.id, { ...product, currentStock: newQuantity });
+          }
+
+          return createdOrder;
+        });
+        break; // success — stop retrying
+      } catch (err) {
+        const isOrderNumberCollision =
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === "P2002" &&
+          Array.isArray(err.meta?.target) &&
+          (err.meta.target as string[]).some(
+            (t) => t.toLowerCase().includes("order_number") || t.toLowerCase().includes("ordernumber")
+          );
+
+        if (isOrderNumberCollision && attempt < MAX_ATTEMPTS) {
+          continue; // retry with a freshly generated order number
         }
+        throw err; // real failure (or retries exhausted) — handled below
       }
+    }
 
-      const subtotal = items.reduce(
-        (sum, i) => sum + i.unitPrice * i.quantity - i.discount,
-        0
-      );
-      const total = Math.max(subtotal - orderDiscount, 0);
-
-      let customerId: string | null = null;
-      if (customerName) {
-        const customer = await tx.customer.create({
-          data: {
-            name: customerName,
-            phone: customerPhone || null,
-            email: customerEmail || null,
-          },
-        });
-        customerId = customer.id;
-      }
-
-      const orderNumber = await generateOrderNumber();
-      const createdOrder = await tx.order.create({
-        data: {
-          orderNumber,
-          customerId,
-          salesChannel: salesChannel as never,
-          stallId: stallId || null,
-          status: "COMPLETED",
-          paymentStatus: "PAID",
-          paymentMethod: paymentMethod as never,
-          subtotal,
-          discount: orderDiscount,
-          total,
-          notes: notes || null,
-        },
-      });
-
-      for (const item of items) {
-        const product = productMap.get(item.productId)!;
-        const itemTotal = item.unitPrice * item.quantity - item.discount;
-
-        await tx.orderItem.create({
-          data: {
-            orderId: createdOrder.id,
-            productId: product.id,
-            productNameSnapshot: product.name,
-            skuSnapshot: product.sku,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            discount: item.discount,
-            total: itemTotal,
-          },
-        });
-
-        const previousQuantity = product.currentStock;
-        const newQuantity = previousQuantity - item.quantity;
-
-        await tx.product.update({
-          where: { id: product.id },
-          data: { currentStock: newQuantity },
-        });
-
-        await tx.stockMovement.create({
-          data: {
-            productId: product.id,
-            movementType: "POS_SALE",
-            quantity: -item.quantity,
-            previousQuantity,
-            newQuantity,
-            reason: "POS Sale",
-            referenceType: "ORDER",
-            referenceId: createdOrder.id,
-          },
-        });
-
-        // Keep productMap in sync in case the same product appears twice in the cart
-        productMap.set(product.id, { ...product, currentStock: newQuantity });
-      }
-
-      return createdOrder;
-    });
+    if (!order) {
+      throw new Error("Could not generate a unique order number after several attempts.");
+    }
 
     revalidatePath("/orders");
     revalidatePath("/inventory");
@@ -148,6 +180,10 @@ export async function createOrder(
       return { error: err.message };
     }
     if (err instanceof Error && err.message === "NEXT_REDIRECT") throw err;
+    // Log the real error so it's diagnosable — the generic message below
+    // is all the browser sees, but the actual cause lands in the server
+    // console (your `npm run dev` terminal, or Vercel's Function Logs).
+    console.error("[createOrder] failed:", err);
     return { error: "Something went wrong completing the sale. Please try again." };
   }
 }

@@ -50,7 +50,7 @@ export function PosScreen({
   const [stallId, setStallId] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
-  const [state, formAction] = useActionState(createOrder, undefined);
+  const [state, formAction, isPending] = useActionState(createOrder, undefined);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -361,9 +361,10 @@ export function PosScreen({
 
             <button
               type="submit"
-              className="rounded-md bg-brand py-3 text-[15px] font-semibold text-white hover:opacity-90"
+              disabled={isPending}
+              className="rounded-md bg-brand py-3 text-[15px] font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Complete Sale
+              {isPending ? "Completing sale…" : "Complete Sale"}
             </button>
           </form>
         )}
