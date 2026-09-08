@@ -103,49 +103,62 @@ export async function createOrder(
             },
           });
 
-          for (const item of items) {
+          // Batch the per-line writes instead of awaiting them one at a
+          // time: createMany for order items and stock movements (each
+          // line is independent), and the stock-quantity updates run
+          // concurrently too (different rows, no conflict between them).
+          // This turns ~3 x cart-length sequential round trips into a
+          // small, mostly-parallel batch — the main reason larger carts
+          // were slow enough to hit the transaction timeout.
+          const orderItemRows = items.map((item) => {
             const product = productMap.get(item.productId)!;
-            const itemTotal = item.unitPrice * item.quantity - item.discount;
+            return {
+              orderId: createdOrder.id,
+              productId: product.id,
+              productNameSnapshot: product.name,
+              skuSnapshot: product.sku,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              discount: item.discount,
+              total: item.unitPrice * item.quantity - item.discount,
+            };
+          });
 
-            await tx.orderItem.create({
-              data: {
-                orderId: createdOrder.id,
-                productId: product.id,
-                productNameSnapshot: product.name,
-                skuSnapshot: product.sku,
-                quantity: item.quantity,
-                unitPrice: item.unitPrice,
-                discount: item.discount,
-                total: itemTotal,
-              },
-            });
-
+          const stockMovementRows = items.map((item) => {
+            const product = productMap.get(item.productId)!;
             const previousQuantity = product.currentStock;
             const newQuantity = previousQuantity - item.quantity;
+            return {
+              productId: product.id,
+              movementType: "POS_SALE" as const,
+              quantity: -item.quantity,
+              previousQuantity,
+              newQuantity,
+              reason: "POS Sale",
+              referenceType: "ORDER" as const,
+              referenceId: createdOrder.id,
+            };
+          });
 
-            await tx.product.update({
-              where: { id: product.id },
-              data: { currentStock: newQuantity },
-            });
-
-            await tx.stockMovement.create({
-              data: {
-                productId: product.id,
-                movementType: "POS_SALE",
-                quantity: -item.quantity,
-                previousQuantity,
-                newQuantity,
-                reason: "POS Sale",
-                referenceType: "ORDER",
-                referenceId: createdOrder.id,
-              },
-            });
-
-            // Keep productMap in sync in case the same product appears twice in the cart
-            productMap.set(product.id, { ...product, currentStock: newQuantity });
-          }
+          await Promise.all([
+            tx.orderItem.createMany({ data: orderItemRows }),
+            tx.stockMovement.createMany({ data: stockMovementRows }),
+            ...stockMovementRows.map((row) =>
+              tx.product.update({
+                where: { id: row.productId },
+                data: { currentStock: row.newQuantity },
+              })
+            ),
+          ]);
 
           return createdOrder;
+        }, {
+          // Each cart line does 3 sequential writes (order item, stock
+          // update, stock movement). Over a serverless Postgres connection
+          // (e.g. Neon), that adds up fast — Prisma's 5s default timeout
+          // was getting hit once a cart had more than a handful of lines.
+          maxWait: 10_000,
+          timeout: 20_000,
         });
         break; // success — stop retrying
       } catch (err) {
