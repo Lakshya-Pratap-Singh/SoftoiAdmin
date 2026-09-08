@@ -8,6 +8,14 @@ import { getStockStatus, STOCK_STATUS_LABEL, STOCK_STATUS_TONE } from "@/lib/sto
 import { SpreadsheetExportButtons } from "@/components/ui/spreadsheet-export-buttons";
 import { ProductAvatar } from "@/components/ui/product-avatar";
 
+function typeLabel(type: string) {
+  return type
+    .toLowerCase()
+    .split("_")
+    .map((w) => w[0].toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
 export default async function InventoryPage({
   searchParams,
 }: {
@@ -40,11 +48,17 @@ export default async function InventoryPage({
         actions={<SpreadsheetExportButtons filename="inventory" rows={products.map((product) => ({
           "Product Code": product.productCode,
           "Product Name": product.name,
-          SKU: product.sku,
+          SKU: product.sku ?? "",
           Category: product.category?.name ?? "",
+          "Product Type": typeLabel(product.productType),
+          Description: product.description ?? "",
+          "Cost Price": product.costPrice?.toString() ?? "",
+          "Selling Price": product.sellingPrice?.toString() ?? "",
           "Current Stock": product.currentStock,
           "Minimum Stock": product.minimumStock,
           "Stock Status": STOCK_STATUS_LABEL[getStockStatus(product.currentStock, product.minimumStock)],
+          Notes: product.notes ?? "",
+          "Image URL": product.imageUrl ?? "",
         }))} />}
       />
 

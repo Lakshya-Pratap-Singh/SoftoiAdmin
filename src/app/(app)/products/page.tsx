@@ -76,14 +76,19 @@ export default async function ProductsPage({
               rows={filtered.map((product) => ({
                 "Product Code": product.productCode,
                 "Product Name": product.name,
-                SKU: product.sku,
+                SKU: product.sku ?? "",
                 Category: product.category?.name ?? "",
                 "Product Type": typeLabel(product.productType),
-                "Current Stock": product.currentStock,
-                "Minimum Stock": product.minimumStock,
+                Description: product.description ?? "",
                 "Cost Price": product.costPrice?.toString() ?? "",
                 "Selling Price": product.sellingPrice?.toString() ?? "",
+                "Current Stock": product.currentStock,
+                "Minimum Stock": product.minimumStock,
+                "Stock Status": STOCK_STATUS_LABEL[getStockStatus(product.currentStock, product.minimumStock)],
                 Status: product.status === "ACTIVE" ? "Active" : "Archived",
+                Notes: product.notes ?? "",
+                "Image URL": product.imageUrl ?? "",
+                "Created At": product.createdAt.toISOString().slice(0, 10),
               }))}
             />
             <Link
