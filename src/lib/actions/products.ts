@@ -121,9 +121,28 @@ export async function importProducts(rows: ImportedProduct[]): Promise<ImportRes
   const existingSkus = new Set(existing.map((product) => normalizedName(product.sku ?? "")));
   const seenSkus = new Set<string>();
   const validTypes = new Set(["FINISHED_PRODUCT", "RAW_MATERIAL", "COMPONENT"]);
-  let imported = 0;
   let skipped = 0;
   const messages: string[] = [];
+
+  // Validate every row in memory first — no DB calls in this loop. Each
+  // product used to generate its code and insert via a separate round
+  // trip, so 81 rows meant hundreds of sequential queries to Neon, easily
+  // exceeding a serverless function's time limit and silently truncating
+  // the import partway through. Everything below is written in a small,
+  // fixed number of batched calls instead, regardless of row count.
+  type PreparedRow = {
+    rowNumber: number;
+    name: string;
+    sku: string | null;
+    categoryId: string | null;
+    productType: string;
+    initialStock: number;
+    minimumStock: number;
+    costPrice: number | null;
+    sellingPrice: number | null;
+    imageUrl: string | null;
+  };
+  const prepared: PreparedRow[] = [];
 
   for (let index = 0; index < rows.length; index += 1) {
     const row = rows[index];
@@ -154,44 +173,91 @@ export async function importProducts(rows: ImportedProduct[]): Promise<ImportRes
     }
     if (sku) seenSkus.add(normalizedName(sku));
 
-    try {
-      await prisma.$transaction(async (tx) => {
-        const product = await tx.product.create({
-          data: {
-            productCode: await generateProductCode(),
-            name,
-            sku: sku || null,
-            categoryId: categoryId ?? null,
-            productType: type as never,
-            currentStock: initialStock,
-            minimumStock,
-            costPrice,
-            sellingPrice,
-            imageUrl,
-          },
-        });
-        if (initialStock > 0) {
-          await tx.stockMovement.create({
-            data: {
-              productId: product.id,
-              movementType: "INITIAL_STOCK",
-              quantity: initialStock,
-              previousQuantity: 0,
-              newQuantity: initialStock,
-              reason: "Initial stock on product import",
-              referenceType: "PRODUCT_IMPORT",
-              referenceId: product.id,
-              createdById: session.user.id,
-            },
-          });
-        }
-      });
-      imported += 1;
-      if (sku) existingSkus.add(normalizedName(sku));
-    } catch {
-      skipped += 1;
-      if (messages.length < 10) messages.push(`Row ${rowNumber}: Could not be imported. Check that its SKU is unique.`);
+    prepared.push({
+      rowNumber,
+      name,
+      sku: sku || null,
+      categoryId: categoryId ?? null,
+      productType: type,
+      initialStock,
+      minimumStock,
+      costPrice,
+      sellingPrice,
+      imageUrl,
+    });
+  }
+
+  if (prepared.length === 0) {
+    revalidatePath("/products");
+    return { imported: 0, skipped, messages };
+  }
+
+  let imported = 0;
+
+  try {
+    // One count() call for the whole batch — codes are then assigned
+    // sequentially in memory rather than re-querying per row.
+    const startCount = await prisma.product.count();
+    const codedRows = prepared.map((row, i) => ({
+      ...row,
+      productCode: `SOF-${String(startCount + i + 1).padStart(4, "0")}`,
+    }));
+
+    await prisma.product.createMany({
+      data: codedRows.map((row) => ({
+        productCode: row.productCode,
+        name: row.name,
+        sku: row.sku,
+        categoryId: row.categoryId,
+        productType: row.productType as never,
+        currentStock: row.initialStock,
+        minimumStock: row.minimumStock,
+        costPrice: row.costPrice,
+        sellingPrice: row.sellingPrice,
+        imageUrl: row.imageUrl,
+      })),
+    });
+
+    // createMany doesn't return the created rows, so fetch back just the
+    // id + code pairs we need to write matching stock-movement entries.
+    const createdProducts = await prisma.product.findMany({
+      where: { productCode: { in: codedRows.map((r) => r.productCode) } },
+      select: { id: true, productCode: true },
+    });
+    const idByCode = new Map(createdProducts.map((p) => [p.productCode, p.id]));
+
+    const movementRows = codedRows
+      .filter((row) => row.initialStock > 0)
+      .map((row) => {
+        const productId = idByCode.get(row.productCode);
+        if (!productId) return null;
+        return {
+          productId,
+          movementType: "INITIAL_STOCK" as const,
+          quantity: row.initialStock,
+          previousQuantity: 0,
+          newQuantity: row.initialStock,
+          reason: "Initial stock on product import",
+          referenceType: "PRODUCT_IMPORT" as const,
+          referenceId: productId,
+          createdById: session.user.id,
+        };
+      })
+      .filter((row): row is NonNullable<typeof row> => row !== null);
+
+    if (movementRows.length > 0) {
+      await prisma.stockMovement.createMany({ data: movementRows });
     }
+
+    imported = createdProducts.length;
+  } catch (err) {
+    console.error("[importProducts] batch insert failed:", err);
+    return {
+      imported: 0,
+      skipped: rows.length,
+      messages: [],
+      error: "Something went wrong importing products. Please try again — if it keeps failing, try a smaller file.",
+    };
   }
 
   revalidatePath("/products");

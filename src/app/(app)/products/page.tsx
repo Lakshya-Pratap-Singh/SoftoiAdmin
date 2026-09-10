@@ -10,6 +10,12 @@ import { ProductImport } from "@/components/products/product-import";
 import { SpreadsheetExportButtons } from "@/components/ui/spreadsheet-export-buttons";
 import { ProductAvatar } from "@/components/ui/product-avatar";
 
+// Raises the serverless function time limit on Vercel for actions invoked
+// from this page (like product import) past the platform default, as a
+// safety margin on top of batching the import into a fixed number of
+// DB calls. Harmless locally / on other hosts — they ignore this export.
+export const maxDuration = 60;
+
 const PRODUCT_TYPES = ["FINISHED_PRODUCT", "RAW_MATERIAL", "COMPONENT"] as const;
 
 function typeLabel(type: string) {
