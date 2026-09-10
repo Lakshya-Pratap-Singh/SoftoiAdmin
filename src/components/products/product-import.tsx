@@ -4,6 +4,7 @@ import { ChangeEvent, useMemo, useState, useTransition } from "react";
 import { Download, FileUp, Upload, X } from "lucide-react";
 import * as XLSX from "xlsx";
 import { importProducts } from "@/lib/actions/products";
+import { ProductAvatar } from "@/components/ui/product-avatar";
 
 const HEADERS = [
   "Product Name",
@@ -16,6 +17,10 @@ const HEADERS = [
   "Selling Price",
 ] as const;
 
+// Recognized but not required — files exported before this existed (or the
+// template downloaded before now) still import fine without it.
+const OPTIONAL_HEADERS = ["Image URL"] as const;
+
 type ImportRow = {
   rowNumber: number;
   name: string;
@@ -26,6 +31,7 @@ type ImportRow = {
   minimumStock: string;
   costPrice: string;
   sellingPrice: string;
+  imageUrl: string;
   errors: string[];
 };
 
@@ -51,6 +57,7 @@ function validateRows(values: Record<string, unknown>[], categories: Category[],
         minimumStock: toText(value["Minimum Stock"]),
         costPrice: toText(value["Cost Price"]),
         sellingPrice: toText(value["Selling Price"]),
+        imageUrl: toText(value["Image URL"]),
         errors: [],
       };
       const blank = [row.name, row.sku, row.category, row.initialStock, row.minimumStock, row.costPrice, row.sellingPrice].every((cell) => !cell);
@@ -88,8 +95,8 @@ export function ProductImport({ categories, existingSkus }: { categories: Catego
 
   function downloadTemplate() {
     const worksheet = XLSX.utils.aoa_to_sheet([
-      [...HEADERS],
-      ["Example Product", "SKU-001", categories[0]?.name ?? "", "FINISHED_PRODUCT", 10, 2, 50, 99],
+      [...HEADERS, ...OPTIONAL_HEADERS],
+      ["Example Product", "SKU-001", categories[0]?.name ?? "", "FINISHED_PRODUCT", 10, 2, 50, 99, "https://res.cloudinary.com/…"],
     ]);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Products");
@@ -139,6 +146,7 @@ export function ProductImport({ categories, existingSkus }: { categories: Catego
         minimumStock: row.minimumStock,
         costPrice: row.costPrice,
         sellingPrice: row.sellingPrice,
+        imageUrl: row.imageUrl,
       })));
       setSummary(result.error ?? `Imported: ${result.imported}. Skipped: ${result.skipped}.${result.messages.length ? ` ${result.messages.join(" ")}` : ""}`);
       if (!result.error) setRows([]);
@@ -166,7 +174,7 @@ export function ProductImport({ categories, existingSkus }: { categories: Catego
             {fileError && <p role="alert" className="mt-4 rounded-md bg-bad-tint px-3.5 py-2.5 text-sm text-bad">{fileError}</p>}
             {rows.length > 0 && <>
               <div className="mt-4 rounded-md bg-surface-sunken px-4 py-3 text-sm text-ink">Total rows: {rows.length} · Valid: {validRows.length} · Invalid: {rows.length - validRows.length} · Skipped: 0</div>
-              <div className="mt-4 overflow-x-auto rounded-lg border border-border bg-surface"><table className="w-full text-left text-sm"><thead className="bg-surface-sunken text-xs text-ink-muted"><tr><th className="px-3 py-3">Row</th><th className="px-3 py-3">Product</th><th className="px-3 py-3">SKU</th><th className="px-3 py-3">Category</th><th className="px-3 py-3">Price</th><th className="px-3 py-3">Stock</th><th className="px-3 py-3">Status</th></tr></thead><tbody className="divide-y divide-border">{rows.map((row) => <tr key={row.rowNumber}><td className="px-3 py-3 text-ink-muted">{row.rowNumber}</td><td className="px-3 py-3 font-medium">{row.name || "—"}</td><td className="px-3 py-3">{row.sku || "—"}</td><td className="px-3 py-3">{row.category || "—"}</td><td className="px-3 py-3">{row.sellingPrice || "—"}</td><td className="px-3 py-3">{row.initialStock || "—"}</td><td className={`px-3 py-3 ${row.errors.length ? "text-bad" : "text-good"}`}>{row.errors.length ? row.errors.join(" ") : "Valid"}</td></tr>)}</tbody></table></div>
+              <div className="mt-4 overflow-x-auto rounded-lg border border-border bg-surface"><table className="w-full text-left text-sm"><thead className="bg-surface-sunken text-xs text-ink-muted"><tr><th className="px-3 py-3">Row</th><th className="px-3 py-3">Image</th><th className="px-3 py-3">Product</th><th className="px-3 py-3">SKU</th><th className="px-3 py-3">Category</th><th className="px-3 py-3">Price</th><th className="px-3 py-3">Stock</th><th className="px-3 py-3">Status</th></tr></thead><tbody className="divide-y divide-border">{rows.map((row) => <tr key={row.rowNumber}><td className="px-3 py-3 text-ink-muted">{row.rowNumber}</td><td className="px-3 py-3"><ProductAvatar src={row.imageUrl || null} alt={row.name || "Product"} size={28} rounded="md" /></td><td className="px-3 py-3 font-medium">{row.name || "—"}</td><td className="px-3 py-3">{row.sku || "—"}</td><td className="px-3 py-3">{row.category || "—"}</td><td className="px-3 py-3">{row.sellingPrice || "—"}</td><td className="px-3 py-3">{row.initialStock || "—"}</td><td className={`px-3 py-3 ${row.errors.length ? "text-bad" : "text-good"}`}>{row.errors.length ? row.errors.join(" ") : "Valid"}</td></tr>)}</tbody></table></div>
               <div className="mt-5 flex flex-wrap items-center gap-3"><button type="button" disabled={!validRows.length || isPending} onClick={runImport} className="rounded-md bg-brand px-5 py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">{isPending ? "Importing…" : `Import ${validRows.length} valid row${validRows.length === 1 ? "" : "s"}`}</button>{summary && <p role="status" className="text-sm text-ink-muted">{summary}</p>}</div>
             </>}
           </div>

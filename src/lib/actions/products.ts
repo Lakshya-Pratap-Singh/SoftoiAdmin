@@ -16,6 +16,7 @@ type ImportedProduct = {
   minimumStock: string;
   costPrice: string;
   sellingPrice: string;
+  imageUrl: string;
 };
 
 type ImportResult = { imported: number; skipped: number; messages: string[]; error?: string };
@@ -134,6 +135,7 @@ export async function importProducts(rows: ImportedProduct[]): Promise<ImportRes
     const costPrice = row.costPrice ? Number(row.costPrice) : null;
     const sellingPrice = row.sellingPrice ? Number(row.sellingPrice) : null;
     const type = String(row.productType ?? "FINISHED_PRODUCT").trim() || "FINISHED_PRODUCT";
+    const imageUrl = String(row.imageUrl ?? "").trim() || null;
     const rowNumber = index + 2;
     let reason = "";
 
@@ -165,6 +167,7 @@ export async function importProducts(rows: ImportedProduct[]): Promise<ImportRes
             minimumStock,
             costPrice,
             sellingPrice,
+            imageUrl,
           },
         });
         if (initialStock > 0) {
