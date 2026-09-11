@@ -80,3 +80,34 @@ export async function restoreArtisan(id: string) {
   revalidatePath("/artisans");
   revalidatePath(`/artisans/${id}`);
 }
+
+/**
+ * Syncs which products belong to this artisan from a checkbox selection.
+ * Checked products get artisanId set to this artisan (taking over from
+ * whichever artisan they were linked to before, if any — a product has
+ * only one maker at a time). Products that were assigned to this artisan
+ * but got unchecked are unassigned (artisanId set back to null).
+ */
+export async function assignProductsToArtisan(artisanId: string, formData: FormData) {
+  "use server";
+  const selectedIds = formData.getAll("productIds").map(String).filter(Boolean);
+
+  await prisma.$transaction([
+    prisma.product.updateMany({
+      where: { artisanId, id: { notIn: selectedIds } },
+      data: { artisanId: null },
+    }),
+    ...(selectedIds.length > 0
+      ? [
+          prisma.product.updateMany({
+            where: { id: { in: selectedIds } },
+            data: { artisanId },
+          }),
+        ]
+      : []),
+  ]);
+
+  revalidatePath(`/artisans/${artisanId}`);
+  revalidatePath("/artisans");
+  revalidatePath("/products");
+}

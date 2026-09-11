@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { StatCard } from "@/components/ui/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ProductAvatar } from "@/components/ui/product-avatar";
+import { ProductAssignmentPanel } from "@/components/artisans/product-assignment-panel";
 import { formatCurrency } from "@/lib/utils";
 import { ARTISAN_TYPE_LABEL } from "@/lib/artisan-type";
 import { archiveArtisan, restoreArtisan } from "@/lib/actions/artisans";
@@ -36,6 +37,27 @@ export default async function ArtisanDetailPage({ params }: { params: Promise<{ 
   const salesMap = new Map(
     salesByProduct.map((row) => [row.productId, { units: row._sum.quantity ?? 0, sales: row._sum.total?.toString() ?? "0" }])
   );
+
+  const allProducts = await prisma.product.findMany({
+    where: { status: "ACTIVE" },
+    orderBy: { name: "asc" },
+    select: {
+      id: true,
+      name: true,
+      sku: true,
+      imageUrl: true,
+      artisanId: true,
+      artisan: { select: { name: true } },
+    },
+  });
+  const assignableProducts = allProducts.map((p) => ({
+    id: p.id,
+    name: p.name,
+    sku: p.sku,
+    imageUrl: p.imageUrl,
+    artisanId: p.artisanId,
+    artisanName: p.artisan?.name ?? null,
+  }));
 
   const totalStock = artisan.products.reduce((sum, p) => sum + p.currentStock, 0);
   const netSales = salesByProduct.reduce((sum, row) => sum + Number(row._sum.total ?? 0), 0);
@@ -139,6 +161,8 @@ export default async function ArtisanDetailPage({ params }: { params: Promise<{ 
           </table>
         </div>
       )}
+
+      <ProductAssignmentPanel artisanId={artisan.id} artisanName={artisan.name} products={assignableProducts} />
     </div>
   );
 }
