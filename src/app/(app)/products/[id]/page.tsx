@@ -19,6 +19,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     where: { id },
     include: {
       category: { select: { name: true } },
+      artisan: { select: { id: true, name: true, code: true } },
       stockMovements: { orderBy: { movementDate: "desc" }, take: 10 },
     },
   });
@@ -85,6 +86,16 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
           <dl className="grid grid-cols-2 gap-y-3 text-sm">
             <dt className="text-ink-muted">Category</dt>
             <dd className="text-ink">{product.category?.name || "—"}</dd>
+            <dt className="text-ink-muted">Artisan</dt>
+            <dd className="text-ink">
+              {product.artisan ? (
+                <Link href={`/artisans/${product.artisan.id}`} className="text-brand hover:underline">
+                  {product.artisan.name} ({product.artisan.code})
+                </Link>
+              ) : (
+                "—"
+              )}
+            </dd>
             <dt className="text-ink-muted">Product type</dt>
             <dd className="text-ink">{typeLabel(product.productType)}</dd>
             <dt className="text-ink-muted">Description</dt>

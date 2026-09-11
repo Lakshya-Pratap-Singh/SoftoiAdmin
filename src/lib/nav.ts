@@ -3,6 +3,7 @@ import {
   LayoutDashboard,
   Package,
   Tags,
+  Hammer,
   Boxes,
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -37,6 +38,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: "Products", href: "/products", icon: Package },
       { label: "Categories", href: "/categories", icon: Tags },
+      { label: "Artisans", href: "/artisans", icon: Hammer },
     ],
   },
   {

@@ -130,6 +130,32 @@ model Category {
 }
 
 // ---------------------------------------------------------------------------
+// ARTISANS
+// ---------------------------------------------------------------------------
+
+enum ArtisanType {
+  FAMILY            // family members / close relatives
+  RAW_MATERIAL_SUPPLIED // we supply the raw material
+  INDEPENDENT       // sources and makes independently
+}
+
+model Artisan {
+  id        String       @id @default(cuid())
+  code      String       @unique // e.g. AB01 — initials + sequential 2-digit
+  name      String
+  type      ArtisanType
+  phone     String?
+  notes     String?
+  status    RecordStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  products Product[]
+
+  @@map("artisans")
+}
+
+// ---------------------------------------------------------------------------
 // PRODUCTS
 // ---------------------------------------------------------------------------
 
@@ -140,6 +166,8 @@ model Product {
   sku            String?      @unique
   categoryId     String?
   category       Category?    @relation(fields: [categoryId], references: [id])
+  artisanId      String?
+  artisan        Artisan?     @relation(fields: [artisanId], references: [id])
   productType    ProductType  @default(FINISHED_PRODUCT)
   description    String?
   imageUrl       String?

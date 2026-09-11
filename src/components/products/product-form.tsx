@@ -7,20 +7,24 @@ import { ImageUpload } from "@/components/products/image-upload";
 import type { ActionState } from "@/lib/actions/categories";
 
 type Category = { id: string; name: string };
+type Artisan = { id: string; name: string; code: string };
 
 export function ProductForm({
   action,
   categories,
+  artisans,
   mode,
   defaults,
 }: {
   action: (state: ActionState, formData: FormData) => Promise<ActionState>;
   categories: Category[];
+  artisans: Artisan[];
   mode: "create" | "edit";
   defaults?: {
     name?: string;
     sku?: string;
     categoryId?: string;
+    artisanId?: string;
     productType?: string;
     description?: string;
     imageUrl?: string;
@@ -64,6 +68,16 @@ export function ProductForm({
               <option value="FINISHED_PRODUCT">Finished Product</option>
               <option value="RAW_MATERIAL">Raw Material</option>
               <option value="COMPONENT">Component</option>
+            </Select>
+          </Field>
+          <Field label="Artisan" htmlFor="artisanId" hint="Who makes this specific product">
+            <Select id="artisanId" name="artisanId" defaultValue={defaults?.artisanId ?? ""}>
+              <option value="">No artisan linked</option>
+              {artisans.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name} ({a.code})
+                </option>
+              ))}
             </Select>
           </Field>
         </div>

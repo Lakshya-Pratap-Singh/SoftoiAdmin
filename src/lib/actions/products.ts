@@ -44,6 +44,7 @@ export async function createProduct(
 
   const sku = String(formData.get("sku") ?? "").trim();
   const categoryId = String(formData.get("categoryId") ?? "").trim();
+  const artisanId = String(formData.get("artisanId") ?? "").trim();
   const productType = String(formData.get("productType") ?? "FINISHED_PRODUCT");
   const description = String(formData.get("description") ?? "").trim();
   const imageUrl = String(formData.get("imageUrl") ?? "").trim();
@@ -66,6 +67,7 @@ export async function createProduct(
           name,
           sku: sku || null,
           categoryId: categoryId || null,
+          artisanId: artisanId || null,
           productType: productType as never,
           description: description || null,
           imageUrl: imageUrl || null,
@@ -277,6 +279,7 @@ export async function updateProduct(
 
   const sku = String(formData.get("sku") ?? "").trim();
   const categoryId = String(formData.get("categoryId") ?? "").trim();
+  const artisanId = String(formData.get("artisanId") ?? "").trim();
   const productType = String(formData.get("productType") ?? "FINISHED_PRODUCT");
   const description = String(formData.get("description") ?? "").trim();
   const imageUrl = String(formData.get("imageUrl") ?? "").trim();
@@ -296,6 +299,7 @@ export async function updateProduct(
       name,
       sku: sku || null,
       categoryId: categoryId || null,
+      artisanId: artisanId || null,
       productType: productType as never,
       description: description || null,
       imageUrl: imageUrl || null,
