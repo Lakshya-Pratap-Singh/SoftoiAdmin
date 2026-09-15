@@ -5,6 +5,7 @@ import { Search, Plus, Minus, Trash2, ShoppingCart } from "lucide-react";
 import { formatCurrency, cn } from "@/lib/utils";
 import { createOrder } from "@/lib/actions/orders";
 import { ProductAvatar } from "@/components/ui/product-avatar";
+import { QrCode, X } from "lucide-react";
 
 type PosProduct = {
   id: string;
@@ -51,6 +52,7 @@ export function PosScreen({
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [state, formAction, isPending] = useActionState(createOrder, undefined);
+  const [showQr, setShowQr] = useState(false);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -330,7 +332,10 @@ export function PosScreen({
                 <button
                   key={m}
                   type="button"
-                  onClick={() => setPaymentMethod(m)}
+                  onClick={() => {
+                    setPaymentMethod(m);
+                    if (m !== "UPI") setShowQr(false);
+                  }}
                   className={cn(
                     "rounded-md border px-2 py-1.5 text-xs font-medium",
                     paymentMethod === m
@@ -343,6 +348,16 @@ export function PosScreen({
               ))}
             </div>
             <input type="hidden" name="paymentMethod" value={paymentMethod} />
+
+            {paymentMethod === "UPI" && (
+              <button
+                type="button"
+                onClick={() => setShowQr(true)}
+                className="flex items-center justify-center gap-2 rounded-md border border-border bg-surface py-2 text-xs font-medium text-ink hover:bg-surface-sunken"
+              >
+                <QrCode size={14} /> Show QR
+              </button>
+            )}
 
             <div className="flex justify-between text-sm text-ink-muted">
               <span>Subtotal</span>
@@ -369,6 +384,31 @@ export function PosScreen({
           </form>
         )}
       </div>
+
+      {showQr && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setShowQr(false)}
+        >
+          <div
+            className="relative max-w-xs rounded-lg bg-surface p-5 text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setShowQr(false)}
+              className="absolute right-3 top-3 rounded-md p-1 text-ink-muted hover:bg-surface-sunken hover:text-ink"
+              aria-label="Close"
+            >
+              <X size={18} />
+            </button>
+            <p className="mb-3 text-sm font-medium text-ink">Scan to pay via UPI</p>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/upi-qr.png" alt="UPI payment QR code" className="mx-auto w-full max-w-[260px] rounded-md" />
+            <p className="mt-3 text-sm font-semibold text-ink">{formatCurrency(total)}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
