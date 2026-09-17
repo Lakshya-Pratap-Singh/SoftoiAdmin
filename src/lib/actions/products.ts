@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { generateProductCode } from "@/lib/id-generators";
+import { generateProductCode, generateSku } from "@/lib/id-generators";
 import { auth } from "@/lib/auth";
 import type { ActionState } from "@/lib/actions/categories";
 
@@ -61,11 +61,12 @@ export async function createProduct(
   try {
     await prisma.$transaction(async (tx) => {
       const productCode = await generateProductCode();
+      const finalSku = sku || (await generateSku());
       const product = await tx.product.create({
         data: {
           productCode,
           name,
-          sku: sku || null,
+          sku: finalSku,
           categoryId: categoryId || null,
           artisanId: artisanId || null,
           productType: productType as never,
@@ -292,12 +293,13 @@ export async function updateProduct(
     const existingSku = await prisma.product.findFirst({ where: { sku, NOT: { id } } });
     if (existingSku) return { error: `SKU "${sku}" is already in use.` };
   }
+  const finalSku = sku || (await generateSku());
 
   await prisma.product.update({
     where: { id },
     data: {
       name,
-      sku: sku || null,
+      sku: finalSku,
       categoryId: categoryId || null,
       artisanId: artisanId || null,
       productType: productType as never,

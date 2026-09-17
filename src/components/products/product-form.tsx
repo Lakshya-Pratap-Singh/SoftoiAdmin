@@ -50,8 +50,8 @@ export function ProductForm({
               <TextInput id="initialQuantity" name="initialQuantity" type="number" min={0} required placeholder="0" />
             </Field>
           )}
-          <Field label="SKU" htmlFor="sku">
-            <TextInput id="sku" name="sku" defaultValue={defaults?.sku} placeholder="Optional" />
+          <Field label="SKU" htmlFor="sku" hint="Auto-generated (e.g. SKU-014) if left blank">
+            <TextInput id="sku" name="sku" defaultValue={defaults?.sku} placeholder="Leave blank to auto-generate" />
           </Field>
           <Field label="Category" htmlFor="categoryId">
             <Select id="categoryId" name="categoryId" defaultValue={defaults?.categoryId ?? ""}>

@@ -6,6 +6,22 @@ export async function generateProductCode(): Promise<string> {
   return `SOF-${String(count + 1).padStart(4, "0")}`;
 }
 
+/**
+ * Generates a SKU in the "SKU-001" style your import sheets already use.
+ * Checks for a free one rather than trusting count() alone, since manually
+ * entered or imported SKUs can already occupy a number the count would
+ * otherwise reuse.
+ */
+export async function generateSku(): Promise<string> {
+  let n = await prisma.product.count();
+  let sku = `SKU-${String(n + 1).padStart(3, "0")}`;
+  while (await prisma.product.findUnique({ where: { sku } })) {
+    n += 1;
+    sku = `SKU-${String(n + 1).padStart(3, "0")}`;
+  }
+  return sku;
+}
+
 /** Generates the next sequential stall code, e.g. STL-0001. */
 export async function generateStallCode(): Promise<string> {
   const count = await prisma.stall.count();
