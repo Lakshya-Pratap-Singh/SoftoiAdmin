@@ -11,6 +11,9 @@ import {
   ArrowUpFromLine,
   SlidersHorizontal,
   ShoppingCart,
+  TrendingUp,
+  BadgePercent,
+  IndianRupee,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui/card";
@@ -27,6 +30,8 @@ async function getDashboardData() {
     products,
     recentMovements,
     todaysOrders,
+    completedOrdersAgg,
+    completedOrderItems,
   ] = await Promise.all([
     prisma.product.count({ where: { status: "ACTIVE" } }),
     prisma.product.aggregate({
@@ -53,6 +58,21 @@ async function getDashboardData() {
       where: { orderDate: { gte: startOfToday }, status: "COMPLETED" },
       select: { id: true, total: true },
     }),
+    // Order-level totals: total is what was actually charged, discount
+    // here is only the extra order-wide discount (line-level discounts
+    // are already netted into each item's total, so they're pulled
+    // separately below).
+    prisma.order.aggregate({
+      where: { status: "COMPLETED" },
+      _sum: { total: true, discount: true },
+    }),
+    // Cost price isn't snapshotted per order line, so profit uses each
+    // product's current cost price as an approximation — same convention
+    // the Inventory Value tile above already uses.
+    prisma.orderItem.findMany({
+      where: { order: { status: "COMPLETED" } },
+      select: { quantity: true, discount: true, product: { select: { costPrice: true } } },
+    }),
   ]);
 
   const lowStock = products.filter(
@@ -66,6 +86,16 @@ async function getDashboardData() {
 
   const todaysSales = todaysOrders.reduce((sum, o) => sum + Number(o.total), 0);
 
+  const netSales = Number(completedOrdersAgg._sum.total ?? 0);
+  const orderLevelDiscount = Number(completedOrdersAgg._sum.discount ?? 0);
+  const itemLevelDiscount = completedOrderItems.reduce((sum, i) => sum + Number(i.discount), 0);
+  const netDiscount = orderLevelDiscount + itemLevelDiscount;
+  const costOfGoodsSold = completedOrderItems.reduce(
+    (sum, i) => sum + i.quantity * Number(i.product?.costPrice ?? 0),
+    0
+  );
+  const netProfit = netSales - costOfGoodsSold;
+
   return {
     totalProducts,
     totalUnits: stockAgg._sum.currentStock ?? 0,
@@ -78,6 +108,9 @@ async function getDashboardData() {
     recentMovements,
     todaysOrdersCount: todaysOrders.length,
     todaysSales,
+    netSales,
+    netDiscount,
+    netProfit,
   };
 }
 
@@ -126,6 +159,16 @@ export default async function DashboardPage() {
       <div className="mt-4 grid grid-cols-2 gap-4">
         <StatCard label="Today's Sales" value={formatCurrency(data.todaysSales)} icon={Wallet} />
         <StatCard label="Today's Orders" value={String(data.todaysOrdersCount)} icon={Receipt} />
+      </div>
+
+      {/* All-time sales summary */}
+      <div className="mt-4">
+        <h2 className="mb-3 text-sm font-medium text-ink-muted">All-time sales summary</h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <StatCard label="Net Sales" value={formatCurrency(data.netSales)} icon={TrendingUp} />
+          <StatCard label="Net Discount Given" value={formatCurrency(data.netDiscount)} icon={BadgePercent} tone="warn" />
+          <StatCard label="Profit" value={formatCurrency(data.netProfit)} icon={IndianRupee} tone="good" />
+        </div>
       </div>
 
       {/* Quick actions */}

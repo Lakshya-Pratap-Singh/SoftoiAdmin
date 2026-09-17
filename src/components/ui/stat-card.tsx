@@ -10,7 +10,7 @@ export function StatCard({
   label: string;
   value: string;
   icon: LucideIcon;
-  tone?: "default" | "warn" | "bad";
+  tone?: "default" | "warn" | "bad" | "good";
 }) {
   return (
     <div className="rounded-lg border border-border bg-surface p-5">
@@ -21,6 +21,7 @@ export function StatCard({
             "flex h-8 w-8 items-center justify-center rounded-md",
             tone === "warn" && "bg-warn-tint text-warn",
             tone === "bad" && "bg-bad-tint text-bad",
+            tone === "good" && "bg-good-tint text-good",
             tone === "default" && "bg-brand-tint text-brand"
           )}
         >
