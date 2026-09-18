@@ -14,6 +14,7 @@ import {
   TrendingUp,
   BadgePercent,
   IndianRupee,
+  Coins,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui/card";
@@ -110,6 +111,7 @@ async function getDashboardData() {
     todaysSales,
     netSales,
     netDiscount,
+    netCostPrice: costOfGoodsSold,
     netProfit,
   };
 }
@@ -164,8 +166,9 @@ export default async function DashboardPage() {
       {/* All-time sales summary */}
       <div className="mt-4">
         <h2 className="mb-3 text-sm font-medium text-ink-muted">All-time sales summary</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard label="Net Sales" value={formatCurrency(data.netSales)} icon={TrendingUp} />
+          <StatCard label="Net Cost Price" value={formatCurrency(data.netCostPrice)} icon={Coins} />
           <StatCard label="Net Discount Given" value={formatCurrency(data.netDiscount)} icon={BadgePercent} tone="warn" />
           <StatCard label="Profit" value={formatCurrency(data.netProfit)} icon={IndianRupee} tone="good" />
         </div>
