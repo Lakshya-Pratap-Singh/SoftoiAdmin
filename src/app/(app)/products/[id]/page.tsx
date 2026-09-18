@@ -21,6 +21,12 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       category: { select: { name: true } },
       artisan: { select: { id: true, name: true, code: true } },
       stockMovements: { orderBy: { movementDate: "desc" }, take: 10 },
+      componentsUsed: {
+        include: { componentProduct: { select: { id: true, name: true, imageUrl: true, currentStock: true } } },
+      },
+      usedInProducts: {
+        include: { finishedProduct: { select: { id: true, name: true, imageUrl: true } } },
+      },
     },
   });
   if (!product) notFound();
@@ -137,6 +143,48 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
           </dl>
         </div>
       </div>
+
+      {product.componentsUsed.length > 0 && (
+        <div className="mt-4 rounded-lg border border-border bg-surface p-5">
+          <h2 className="mb-3 text-[15px] font-medium text-ink">Bill of Materials</h2>
+          <ul className="flex flex-col divide-y divide-border">
+            {product.componentsUsed.map((bc) => (
+              <li key={bc.id} className="flex items-center justify-between py-3 text-sm">
+                <Link
+                  href={`/products/${bc.componentProduct.id}`}
+                  className="flex items-center gap-3 font-medium text-ink hover:text-brand"
+                >
+                  <ProductAvatar src={bc.componentProduct.imageUrl} alt={bc.componentProduct.name} size={28} rounded="md" />
+                  {bc.componentProduct.name}
+                </Link>
+                <span className="text-ink-muted">
+                  {bc.quantity.toString()} per unit · {bc.componentProduct.currentStock} in stock
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {product.usedInProducts.length > 0 && (
+        <div className="mt-4 rounded-lg border border-border bg-surface p-5">
+          <h2 className="mb-3 text-[15px] font-medium text-ink">Used In</h2>
+          <ul className="flex flex-col divide-y divide-border">
+            {product.usedInProducts.map((bc) => (
+              <li key={bc.id} className="flex items-center justify-between py-3 text-sm">
+                <Link
+                  href={`/products/${bc.finishedProduct.id}`}
+                  className="flex items-center gap-3 font-medium text-ink hover:text-brand"
+                >
+                  <ProductAvatar src={bc.finishedProduct.imageUrl} alt={bc.finishedProduct.name} size={28} rounded="md" />
+                  {bc.finishedProduct.name}
+                </Link>
+                <span className="text-ink-muted">{bc.quantity.toString()} used per unit</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="mt-4 rounded-lg border border-border bg-surface p-5">
         <h2 className="mb-3 text-[15px] font-medium text-ink">Product history</h2>

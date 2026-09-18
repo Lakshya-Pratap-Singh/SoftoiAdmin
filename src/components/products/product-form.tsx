@@ -4,21 +4,25 @@ import Link from "next/link";
 import { useActionState, useState } from "react";
 import { Field, TextInput, Select, Textarea, SubmitButton, SecondaryButton } from "@/components/ui/form";
 import { ImageUpload } from "@/components/products/image-upload";
+import { BillOfMaterialsEditor } from "@/components/products/bill-of-materials-editor";
 import type { ActionState } from "@/lib/actions/categories";
 
 type Category = { id: string; name: string };
 type Artisan = { id: string; name: string; code: string };
+type ComponentOption = { id: string; name: string; productType: string };
 
 export function ProductForm({
   action,
   categories,
   artisans,
+  componentOptions,
   mode,
   defaults,
 }: {
   action: (state: ActionState, formData: FormData) => Promise<ActionState>;
   categories: Category[];
   artisans: Artisan[];
+  componentOptions: ComponentOption[];
   mode: "create" | "edit";
   defaults?: {
     name?: string;
@@ -32,10 +36,12 @@ export function ProductForm({
     costPrice?: string;
     sellingPrice?: string;
     notes?: string;
+    bomRows?: { componentProductId: string; quantity: string }[];
   };
 }) {
   const [state, formAction] = useActionState(action, undefined);
   const [imageUrl, setImageUrl] = useState(defaults?.imageUrl ?? "");
+  const [productType, setProductType] = useState(defaults?.productType ?? "FINISHED_PRODUCT");
 
   return (
     <form action={formAction} className="flex flex-col gap-8">
@@ -64,7 +70,12 @@ export function ProductForm({
             </Select>
           </Field>
           <Field label="Product type" htmlFor="productType">
-            <Select id="productType" name="productType" defaultValue={defaults?.productType ?? "FINISHED_PRODUCT"}>
+            <Select
+              id="productType"
+              name="productType"
+              value={productType}
+              onChange={(e) => setProductType(e.target.value)}
+            >
               <option value="FINISHED_PRODUCT">Finished Product</option>
               <option value="RAW_MATERIAL">Raw Material</option>
               <option value="COMPONENT">Component</option>
@@ -114,6 +125,16 @@ export function ProductForm({
           </Field>
         </div>
       </section>
+
+      {productType === "FINISHED_PRODUCT" && (
+        <section className="rounded-lg border border-border bg-surface p-6">
+          <h2 className="mb-1 text-[15px] font-medium text-ink">Bill of Materials</h2>
+          <p className="mb-4 text-sm text-ink-muted">
+            What this product is made from — e.g. a bouquet made of stems, wrap, and ribbon.
+          </p>
+          <BillOfMaterialsEditor componentOptions={componentOptions} defaultRows={defaults?.bomRows} />
+        </section>
+      )}
 
       <section className="rounded-lg border border-border bg-surface p-6">
         <h2 className="mb-4 text-[15px] font-medium text-ink">Pricing</h2>

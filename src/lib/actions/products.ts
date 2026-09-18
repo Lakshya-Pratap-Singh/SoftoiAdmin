@@ -29,6 +29,30 @@ function parseDecimal(value: FormDataEntryValue | null): number | null {
   return Number.isFinite(num) ? num : null;
 }
 
+/**
+ * Reads the parallel componentId[]/componentQty[] arrays the Bill of
+ * Materials rows submit, and returns clean {componentProductId, quantity}
+ * pairs — skipping blank rows, self-references, non-positive quantities,
+ * and keeping only the first row if the same component got picked twice.
+ */
+function parseBillOfMaterials(formData: FormData, finishedProductId: string) {
+  const ids = formData.getAll("componentId").map(String);
+  const qtys = formData.getAll("componentQty").map(String);
+  const rows: { componentProductId: string; quantity: number }[] = [];
+  const seen = new Set<string>();
+
+  for (let i = 0; i < ids.length; i++) {
+    const componentId = ids[i]?.trim();
+    const quantity = Number(qtys[i]);
+    if (!componentId || componentId === finishedProductId) continue;
+    if (!Number.isFinite(quantity) || quantity <= 0) continue;
+    if (seen.has(componentId)) continue;
+    seen.add(componentId);
+    rows.push({ componentProductId: componentId, quantity });
+  }
+  return rows;
+}
+
 export async function createProduct(
   _prevState: ActionState,
   formData: FormData
@@ -92,6 +116,17 @@ export async function createProduct(
             referenceType: "PRODUCT_CREATION",
             referenceId: product.id,
           },
+        });
+      }
+
+      const bomRows = parseBillOfMaterials(formData, product.id);
+      if (bomRows.length > 0) {
+        await tx.productComponent.createMany({
+          data: bomRows.map((r) => ({
+            finishedProductId: product.id,
+            componentProductId: r.componentProductId,
+            quantity: r.quantity,
+          })),
         });
       }
     });
@@ -294,22 +329,39 @@ export async function updateProduct(
     if (existingSku) return { error: `SKU "${sku}" is already in use.` };
   }
   const finalSku = sku || (await generateSku());
+  const bomRows = parseBillOfMaterials(formData, id);
 
-  await prisma.product.update({
-    where: { id },
-    data: {
-      name,
-      sku: finalSku,
-      categoryId: categoryId || null,
-      artisanId: artisanId || null,
-      productType: productType as never,
-      description: description || null,
-      imageUrl: imageUrl || null,
-      minimumStock: minimumStockRaw ? Number(minimumStockRaw) : 0,
-      costPrice,
-      sellingPrice,
-      notes: notes || null,
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.product.update({
+      where: { id },
+      data: {
+        name,
+        sku: finalSku,
+        categoryId: categoryId || null,
+        artisanId: artisanId || null,
+        productType: productType as never,
+        description: description || null,
+        imageUrl: imageUrl || null,
+        minimumStock: minimumStockRaw ? Number(minimumStockRaw) : 0,
+        costPrice,
+        sellingPrice,
+        notes: notes || null,
+      },
+    });
+
+    // Replace the whole recipe with what was submitted — simpler and safer
+    // than diffing row-by-row, and this form isn't edited by more than one
+    // person at once.
+    await tx.productComponent.deleteMany({ where: { finishedProductId: id } });
+    if (bomRows.length > 0) {
+      await tx.productComponent.createMany({
+        data: bomRows.map((r) => ({
+          finishedProductId: id,
+          componentProductId: r.componentProductId,
+          quantity: r.quantity,
+        })),
+      });
+    }
   });
 
   revalidatePath("/products");

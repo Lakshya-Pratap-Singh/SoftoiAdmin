@@ -187,9 +187,35 @@ model Product {
   stockMovements StockMovement[]
   orderItems     OrderItem[]
 
+  // Bill of materials: when this product is a finished product, which
+  // components it uses (bouquet -> flowers, wrap, ribbon, etc.)
+  componentsUsed ProductComponent[] @relation("FinishedProductComponents")
+  // The reverse: other finished products that use this product as a component
+  usedInProducts ProductComponent[] @relation("ComponentUsedIn")
+
   @@index([categoryId])
   @@index([status])
   @@map("products")
+}
+
+// ---------------------------------------------------------------------------
+// BILL OF MATERIALS — components used to make a finished product
+// ---------------------------------------------------------------------------
+
+model ProductComponent {
+  id                 String   @id @default(cuid())
+  finishedProductId  String
+  finishedProduct    Product  @relation("FinishedProductComponents", fields: [finishedProductId], references: [id], onDelete: Cascade)
+  componentProductId String
+  componentProduct   Product  @relation("ComponentUsedIn", fields: [componentProductId], references: [id])
+  // Quantity of the component consumed per 1 unit of the finished product —
+  // decimal so fractional amounts work (e.g. 0.5 of a wrap sheet).
+  quantity           Decimal  @db.Decimal(10, 3)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([finishedProductId, componentProductId])
+  @@map("product_components")
 }
 
 // ---------------------------------------------------------------------------

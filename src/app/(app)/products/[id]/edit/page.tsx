@@ -6,13 +6,26 @@ import { updateProduct } from "@/lib/actions/products";
 
 export default async function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [product, categories, artisans] = await Promise.all([
+  const [product, categories, artisans, componentOptions, existingBom] = await Promise.all([
     prisma.product.findUnique({ where: { id } }),
     prisma.category.findMany({ where: { status: "ACTIVE" }, orderBy: { name: "asc" } }),
     prisma.artisan.findMany({
       where: { status: "ACTIVE" },
       orderBy: { name: "asc" },
       select: { id: true, name: true, code: true },
+    }),
+    prisma.product.findMany({
+      where: {
+        status: "ACTIVE",
+        productType: { in: ["RAW_MATERIAL", "COMPONENT"] },
+        NOT: { id },
+      },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, productType: true },
+    }),
+    prisma.productComponent.findMany({
+      where: { finishedProductId: id },
+      select: { componentProductId: true, quantity: true },
     }),
   ]);
   if (!product) notFound();
@@ -26,6 +39,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
         action={boundAction}
         categories={categories}
         artisans={artisans}
+        componentOptions={componentOptions}
         mode="edit"
         defaults={{
           name: product.name,
@@ -39,6 +53,10 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
           costPrice: product.costPrice?.toString(),
           sellingPrice: product.sellingPrice?.toString(),
           notes: product.notes ?? undefined,
+          bomRows: existingBom.map((r) => ({
+            componentProductId: r.componentProductId,
+            quantity: r.quantity.toString(),
+          })),
         }}
       />
     </div>
