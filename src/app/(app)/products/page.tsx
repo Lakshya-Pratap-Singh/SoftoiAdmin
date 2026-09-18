@@ -1,229 +1,254 @@
 import Link from "next/link";
-import { Plus, Package } from "lucide-react";
+import {
+  Package,
+  Boxes,
+  AlertTriangle,
+  XCircle,
+  Wallet,
+  Receipt,
+  PlusCircle,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  SlidersHorizontal,
+  ShoppingCart,
+  TrendingUp,
+  BadgePercent,
+  IndianRupee,
+  Coins,
+} from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/empty-state";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { StatCard } from "@/components/ui/stat-card";
 import { formatCurrency } from "@/lib/utils";
-import { getStockStatus, STOCK_STATUS_LABEL, STOCK_STATUS_TONE } from "@/lib/stock-status";
-import { ProductImport } from "@/components/products/product-import";
-import { SpreadsheetExportButtons } from "@/components/ui/spreadsheet-export-buttons";
-import { ProductAvatar } from "@/components/ui/product-avatar";
 
-// Raises the serverless function time limit on Vercel for actions invoked
-// from this page (like product import) past the platform default, as a
-// safety margin on top of batching the import into a fixed number of
-// DB calls. Harmless locally / on other hosts — they ignore this export.
-export const maxDuration = 60;
+async function getDashboardData() {
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
 
-const PRODUCT_TYPES = ["FINISHED_PRODUCT", "RAW_MATERIAL", "COMPONENT"] as const;
-
-function typeLabel(type: string) {
-  return type
-    .toLowerCase()
-    .split("_")
-    .map((w) => w[0].toUpperCase() + w.slice(1))
-    .join(" ");
-}
-
-export default async function ProductsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{
-    q?: string;
-    category?: string;
-    type?: string;
-    stockStatus?: string;
-    status?: string;
-  }>;
-}) {
-  const { q, category, type, stockStatus, status } = await searchParams;
-
-  const [products, categories, productSkus] = await Promise.all([
-    prisma.product.findMany({
-      where: {
-        status: status === "ARCHIVED" ? "ARCHIVED" : status === "ALL" ? undefined : "ACTIVE",
-        ...(category ? { categoryId: category } : {}),
-        ...(type ? { productType: type as never } : {}),
-        ...(q
-          ? {
-              OR: [
-                { name: { contains: q, mode: "insensitive" } },
-                { sku: { contains: q, mode: "insensitive" } },
-                { productCode: { contains: q, mode: "insensitive" } },
-              ],
-            }
-          : {}),
-      },
-      orderBy: { createdAt: "desc" },
-      include: { category: { select: { name: true } } },
+  const [
+    totalProducts,
+    stockAgg,
+    products,
+    recentMovements,
+    todaysOrders,
+    completedOrdersAgg,
+    completedOrderItems,
+  ] = await Promise.all([
+    prisma.product.count({ where: { status: "ACTIVE" } }),
+    prisma.product.aggregate({
+      where: { status: "ACTIVE" },
+      _sum: { currentStock: true },
     }),
-    prisma.category.findMany({ where: { status: "ACTIVE" }, orderBy: { name: "asc" } }),
-    prisma.product.findMany({ where: { sku: { not: null } }, select: { sku: true } }),
+    prisma.product.findMany({
+      where: { status: "ACTIVE" },
+      select: {
+        id: true,
+        name: true,
+        imageUrl: true,
+        currentStock: true,
+        minimumStock: true,
+        costPrice: true,
+      },
+    }),
+    prisma.stockMovement.findMany({
+      take: 6,
+      orderBy: { movementDate: "desc" },
+      include: { product: { select: { name: true } } },
+    }),
+    prisma.order.findMany({
+      where: { orderDate: { gte: startOfToday }, status: "COMPLETED" },
+      select: { id: true, total: true },
+    }),
+    // Order-level totals: total is what was actually charged, discount
+    // here is only the extra order-wide discount (line-level discounts
+    // are already netted into each item's total, so they're pulled
+    // separately below).
+    prisma.order.aggregate({
+      where: { status: "COMPLETED" },
+      _sum: { total: true, discount: true },
+    }),
+    // Cost price isn't snapshotted per order line, so profit uses each
+    // product's current cost price as an approximation — same convention
+    // the Inventory Value tile above already uses.
+    prisma.orderItem.findMany({
+      where: { order: { status: "COMPLETED" } },
+      select: { quantity: true, discount: true, product: { select: { costPrice: true } } },
+    }),
   ]);
 
-  const filtered = stockStatus
-    ? products.filter((p) => getStockStatus(p.currentStock, p.minimumStock) === stockStatus)
-    : products;
+  const lowStock = products.filter(
+    (p) => p.currentStock > 0 && p.currentStock <= p.minimumStock
+  );
+  const outOfStock = products.filter((p) => p.currentStock === 0);
+  const inventoryValue = products.reduce((sum, p) => {
+    if (!p.costPrice) return sum;
+    return sum + Number(p.costPrice) * p.currentStock;
+  }, 0);
+
+  const todaysSales = todaysOrders.reduce((sum, o) => sum + Number(o.total), 0);
+
+  const netSales = Number(completedOrdersAgg._sum.total ?? 0);
+  const orderLevelDiscount = Number(completedOrdersAgg._sum.discount ?? 0);
+  const itemLevelDiscount = completedOrderItems.reduce((sum, i) => sum + Number(i.discount), 0);
+  const netDiscount = orderLevelDiscount + itemLevelDiscount;
+  const costOfGoodsSold = completedOrderItems.reduce(
+    (sum, i) => sum + i.quantity * Number(i.product?.costPrice ?? 0),
+    0
+  );
+  const netProfit = netSales - costOfGoodsSold;
+
+  return {
+    totalProducts,
+    totalUnits: stockAgg._sum.currentStock ?? 0,
+    lowStockCount: lowStock.length,
+    outOfStockCount: outOfStock.length,
+    inventoryValue,
+    lowStockProducts: lowStock
+      .sort((a, b) => a.currentStock - b.currentStock)
+      .slice(0, 5),
+    recentMovements,
+    todaysOrdersCount: todaysOrders.length,
+    todaysSales,
+    netSales,
+    netDiscount,
+    netCostPrice: costOfGoodsSold,
+    netProfit,
+  };
+}
+
+const quickActions = [
+  { label: "Add Product", href: "/products/new", icon: PlusCircle },
+  { label: "Stock In", href: "/inventory/stock-in", icon: ArrowDownToLine },
+  { label: "Stock Out", href: "/inventory/stock-out", icon: ArrowUpFromLine },
+  { label: "Adjust Stock", href: "/inventory/stock-adjustment", icon: SlidersHorizontal },
+  { label: "New POS Sale", href: "/pos", icon: ShoppingCart },
+];
+
+export default async function DashboardPage() {
+  const data = await getDashboardData();
 
   return (
     <div>
       <PageHeader
-        title="Products"
-        description="Add, edit, search, and organize every product Softoi sells."
-        actions={
-          <>
-            <ProductImport
-              categories={categories.map((category) => ({ id: category.id, name: category.name }))}
-              existingSkus={productSkus.flatMap((product) => (product.sku ? [product.sku] : []))}
-            />
-            <SpreadsheetExportButtons
-              filename="products"
-              rows={filtered.map((product) => ({
-                "Product Code": product.productCode,
-                "Product Name": product.name,
-                SKU: product.sku ?? "",
-                Category: product.category?.name ?? "",
-                "Product Type": typeLabel(product.productType),
-                Description: product.description ?? "",
-                "Cost Price": product.costPrice?.toString() ?? "",
-                "Selling Price": product.sellingPrice?.toString() ?? "",
-                "Current Stock": product.currentStock,
-                "Minimum Stock": product.minimumStock,
-                "Stock Status": STOCK_STATUS_LABEL[getStockStatus(product.currentStock, product.minimumStock)],
-                Status: product.status === "ACTIVE" ? "Active" : "Archived",
-                Notes: product.notes ?? "",
-                "Image URL": product.imageUrl ?? "",
-                "Created At": product.createdAt.toISOString().slice(0, 10),
-              }))}
-            />
-            <Link
-              href="/products/new"
-              className="flex items-center gap-2 rounded-md bg-brand px-4 py-2.5 text-sm font-medium text-white hover:opacity-90"
-            >
-              <Plus size={16} /> Add Product
-            </Link>
-          </>
-        }
+        title="Dashboard"
+        description="An overview of Softoi's products, stock, and today's sales."
       />
 
-      <form className="mb-4 flex flex-wrap gap-2">
-        <input
-          type="text"
-          name="q"
-          defaultValue={q}
-          placeholder="Search name, SKU, or code…"
-          className="rounded-md border border-border bg-surface px-3.5 py-2.5 text-sm text-ink outline-none focus:border-brand"
+      {/* Inventory summary */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <StatCard label="Total Products" value={String(data.totalProducts)} icon={Package} />
+        <StatCard label="Units in Stock" value={String(data.totalUnits)} icon={Boxes} />
+        <StatCard
+          label="Low Stock"
+          value={String(data.lowStockCount)}
+          icon={AlertTriangle}
+          tone="warn"
         />
-        <select
-          name="category"
-          defaultValue={category ?? ""}
-          className="rounded-md border border-border bg-surface px-3.5 py-2.5 text-sm text-ink outline-none focus:border-brand"
-        >
-          <option value="">All categories</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-        <select
-          name="type"
-          defaultValue={type ?? ""}
-          className="rounded-md border border-border bg-surface px-3.5 py-2.5 text-sm text-ink outline-none focus:border-brand"
-        >
-          <option value="">All types</option>
-          {PRODUCT_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {typeLabel(t)}
-            </option>
-          ))}
-        </select>
-        <select
-          name="stockStatus"
-          defaultValue={stockStatus ?? ""}
-          className="rounded-md border border-border bg-surface px-3.5 py-2.5 text-sm text-ink outline-none focus:border-brand"
-        >
-          <option value="">All stock statuses</option>
-          <option value="IN_STOCK">In stock</option>
-          <option value="LOW_STOCK">Low stock</option>
-          <option value="OUT_OF_STOCK">Out of stock</option>
-        </select>
-        <select
-          name="status"
-          defaultValue={status ?? ""}
-          className="rounded-md border border-border bg-surface px-3.5 py-2.5 text-sm text-ink outline-none focus:border-brand"
-        >
-          <option value="">Active only</option>
-          <option value="ARCHIVED">Archived only</option>
-          <option value="ALL">All</option>
-        </select>
-        <button
-          type="submit"
-          className="rounded-md border border-border bg-surface px-4 py-2.5 text-sm font-medium text-ink hover:bg-surface-sunken"
-        >
-          Filter
-        </button>
-      </form>
+        <StatCard
+          label="Out of Stock"
+          value={String(data.outOfStockCount)}
+          icon={XCircle}
+          tone="bad"
+        />
+        <StatCard
+          label="Inventory Value"
+          value={formatCurrency(data.inventoryValue)}
+          icon={Wallet}
+        />
+      </div>
 
-      {filtered.length === 0 ? (
-        <EmptyState
-          icon={Package}
-          title="No products found"
-          description="Try a different search or filter, or add your first product."
-        />
-      ) : (
-        <div className="overflow-x-auto rounded-lg border border-border bg-surface">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-surface-sunken text-xs text-ink-muted">
-              <tr>
-                <th className="px-4 py-3 font-medium">Product</th>
-                <th className="px-4 py-3 font-medium">Code</th>
-                <th className="px-4 py-3 font-medium">SKU</th>
-                <th className="px-4 py-3 font-medium">Category</th>
-                <th className="px-4 py-3 font-medium">Type</th>
-                <th className="px-4 py-3 font-medium">Stock</th>
-                <th className="px-4 py-3 font-medium">Price</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {filtered.map((p) => {
-                const stockStatusValue = getStockStatus(p.currentStock, p.minimumStock);
-                return (
-                  <tr key={p.id}>
-                    <td className="px-4 py-3">
-                      <Link href={`/products/${p.id}`} className="flex items-center gap-3 font-medium text-ink hover:text-brand">
-                        <ProductAvatar src={p.imageUrl} alt={p.name} size={32} />
-                        {p.name}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 text-ink-muted">{p.productCode}</td>
-                    <td className="px-4 py-3 text-ink-muted">{p.sku || "—"}</td>
-                    <td className="px-4 py-3 text-ink-muted">{p.category?.name || "—"}</td>
-                    <td className="px-4 py-3 text-ink-muted">{typeLabel(p.productType)}</td>
-                    <td className="px-4 py-3">
-                      <StatusBadge
-                        label={`${p.currentStock} · ${STOCK_STATUS_LABEL[stockStatusValue]}`}
-                        tone={STOCK_STATUS_TONE[stockStatusValue]}
-                      />
-                    </td>
-                    <td className="px-4 py-3 text-ink-muted">
-                      {p.sellingPrice ? formatCurrency(p.sellingPrice.toString()) : "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge
-                        label={p.status === "ACTIVE" ? "Active" : "Archived"}
-                        tone={p.status === "ACTIVE" ? "good" : "neutral"}
-                      />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      {/* Sales summary */}
+      <div className="mt-4 grid grid-cols-2 gap-4">
+        <StatCard label="Today's Sales" value={formatCurrency(data.todaysSales)} icon={Wallet} />
+        <StatCard label="Today's Orders" value={String(data.todaysOrdersCount)} icon={Receipt} />
+      </div>
+
+      {/* All-time sales summary */}
+      <div className="mt-4">
+        <h2 className="mb-3 text-sm font-medium text-ink-muted">All-time sales summary</h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard label="Net Sales" value={formatCurrency(data.netSales)} icon={TrendingUp} />
+          <StatCard label="Net Cost Price" value={formatCurrency(data.netCostPrice)} icon={Coins} />
+          <StatCard label="Net Discount Given" value={formatCurrency(data.netDiscount)} icon={BadgePercent} tone="warn" />
+          <StatCard label="Profit" value={formatCurrency(data.netProfit)} icon={IndianRupee} tone="good" />
         </div>
-      )}
+      </div>
+
+      {/* Quick actions */}
+      <div className="mt-8">
+        <h2 className="mb-3 text-sm font-medium text-ink-muted">Quick actions</h2>
+        <div className="flex flex-wrap gap-2">
+          {quickActions.map((action) => {
+            const Icon = action.icon;
+            return (
+              <Link
+                key={action.href}
+                href={action.href}
+                className="flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2.5 text-sm font-medium text-ink transition-colors hover:border-brand hover:text-brand"
+              >
+                <Icon size={16} strokeWidth={2} />
+                {action.label}
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="mt-8 grid gap-4 lg:grid-cols-2">
+        {/* Low stock products */}
+        <div className="rounded-lg border border-border bg-surface p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-[15px] font-medium text-ink">Low stock products</h2>
+            <Link href="/inventory/low-stock" className="text-sm font-medium text-brand hover:underline">
+              View all
+            </Link>
+          </div>
+          {data.lowStockProducts.length === 0 ? (
+            <p className="py-6 text-center text-sm text-ink-muted">
+              Nothing is running low right now.
+            </p>
+          ) : (
+            <ul className="flex flex-col divide-y divide-border">
+              {data.lowStockProducts.map((p) => (
+                <li key={p.id} className="flex items-center justify-between py-3">
+                  <div>
+                    <p className="text-[14px] font-medium text-ink">{p.name}</p>
+                    <p className="text-xs text-ink-muted">Minimum {p.minimumStock}</p>
+                  </div>
+                  <span className="rounded-md bg-warn-tint px-2.5 py-1 text-xs font-medium text-warn">
+                    {p.currentStock} left
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* Recent stock activity */}
+        <div className="rounded-lg border border-border bg-surface p-5">
+          <h2 className="mb-3 text-[15px] font-medium text-ink">Recent stock activity</h2>
+          {data.recentMovements.length === 0 ? (
+            <p className="py-6 text-center text-sm text-ink-muted">
+              No stock movements recorded yet.
+            </p>
+          ) : (
+            <ul className="flex flex-col divide-y divide-border">
+              {data.recentMovements.map((m) => (
+                <li key={m.id} className="flex items-center justify-between py-3">
+                  <div>
+                    <p className="text-[14px] font-medium text-ink">{m.product.name}</p>
+                    <p className="text-xs text-ink-muted">{m.reason}</p>
+                  </div>
+                  <span className="text-sm font-medium text-ink-muted">
+                    {m.quantity > 0 ? "+" : ""}
+                    {m.quantity}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
