@@ -184,7 +184,7 @@ export function PosScreen({
             No products match{categoryId ? " this category" : " your search"}.
           </div>
         ) : (
-          <div className="grid flex-1 grid-cols-2 gap-3 overflow-y-auto pb-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+          <div className="grid flex-1 grid-cols-2 gap-2 overflow-y-auto pb-2 sm:grid-cols-3 sm:gap-3 2xl:grid-cols-4">
             {filtered.map((p) => {
               const outOfStock = p.currentStock <= 0;
               return (
@@ -194,14 +194,14 @@ export function PosScreen({
                   disabled={outOfStock}
                   onClick={() => addToCart(p)}
                   className={cn(
-                    "flex flex-col items-start gap-1 rounded-lg border border-border bg-surface p-3 text-left transition-colors",
+                    "flex flex-col items-start gap-1 rounded-lg border border-border bg-surface p-2 text-left transition-colors sm:p-3",
                     outOfStock ? "cursor-not-allowed opacity-50" : "hover:border-brand"
                   )}
                 >
-                  <ProductAvatar src={p.imageUrl} alt={p.name} size={44} rounded="md" className="mb-1" />
-                  <p className="line-clamp-2 text-sm font-medium text-ink">{p.name}</p>
-                  <p className="text-xs text-ink-faint">{p.currentStock} in stock</p>
-                  <p className="mt-auto pt-1 text-sm font-semibold text-brand">
+                  <ProductAvatar src={p.imageUrl} alt={p.name} size={40} rounded="md" className="mb-1" />
+                  <p className="line-clamp-2 text-xs font-medium text-ink sm:text-sm">{p.name}</p>
+                  <p className="text-[11px] text-ink-faint sm:text-xs">{p.currentStock} in stock</p>
+                  <p className="mt-auto pt-1 text-xs font-semibold text-brand sm:text-sm">
                     {p.sellingPrice ? formatCurrency(p.sellingPrice) : "—"}
                   </p>
                 </button>
