@@ -53,6 +53,7 @@ export function PosScreen({
   const [customerPhone, setCustomerPhone] = useState("");
   const [state, formAction, isPending] = useActionState(createOrder, undefined);
   const [showQr, setShowQr] = useState(false);
+  const [cartOpen, setCartOpen] = useState(false);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -134,7 +135,7 @@ export function PosScreen({
   return (
     <div className="grid gap-4 lg:h-[calc(100vh-8rem)] lg:grid-cols-[1fr_380px]">
       {/* Product area */}
-      <div className="flex min-h-0 flex-col">
+      <div className="flex min-h-0 flex-col pb-20 lg:pb-0">
         <div className="relative mb-3">
           <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint" />
           <input
@@ -183,7 +184,7 @@ export function PosScreen({
             No products match{categoryId ? " this category" : " your search"}.
           </div>
         ) : (
-          <div className="grid flex-1 grid-cols-2 gap-3 overflow-y-auto pb-2 sm:grid-cols-3 xl:grid-cols-4">
+          <div className="grid flex-1 grid-cols-2 gap-3 overflow-y-auto pb-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
             {filtered.map((p) => {
               const outOfStock = p.currentStock <= 0;
               return (
@@ -211,10 +212,28 @@ export function PosScreen({
       </div>
 
       {/* Cart */}
-      <div className="flex min-h-0 flex-col rounded-lg border border-border bg-surface p-4">
-        <div className="mb-3 flex items-center gap-2">
-          <ShoppingCart size={18} className="text-brand" />
-          <h2 className="text-[15px] font-medium text-ink">Cart</h2>
+      <div
+        className={cn(
+          "flex min-h-0 flex-col rounded-lg border border-border bg-surface p-4",
+          "lg:static lg:flex lg:h-auto lg:w-auto lg:rounded-lg",
+          cartOpen
+            ? "fixed inset-0 z-40 h-full w-full overflow-y-auto rounded-none lg:relative lg:inset-auto lg:h-auto lg:w-auto lg:overflow-visible lg:rounded-lg"
+            : "hidden lg:flex"
+        )}
+      >
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <ShoppingCart size={18} className="text-brand" />
+            <h2 className="text-[15px] font-medium text-ink">Cart</h2>
+          </div>
+          <button
+            type="button"
+            onClick={() => setCartOpen(false)}
+            className="rounded-md p-1.5 text-ink-muted hover:bg-surface-sunken hover:text-ink lg:hidden"
+            aria-label="Close cart"
+          >
+            <X size={20} />
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -384,6 +403,21 @@ export function PosScreen({
           </form>
         )}
       </div>
+
+      {cart.length > 0 && !cartOpen && (
+        <button
+          type="button"
+          onClick={() => setCartOpen(true)}
+          className="fixed inset-x-4 bottom-4 z-30 flex items-center justify-between rounded-lg bg-brand px-5 py-3.5 text-white shadow-lg lg:hidden"
+        >
+          <span className="text-sm font-medium">
+            {cart.length} item{cart.length > 1 ? "s" : ""} · {formatCurrency(total)}
+          </span>
+          <span className="flex items-center gap-1.5 text-sm font-semibold">
+            View Cart <ShoppingCart size={16} />
+          </span>
+        </button>
+      )}
 
       {showQr && (
         <div
