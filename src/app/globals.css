@@ -63,6 +63,12 @@ body {
   background: var(--color-canvas);
   color: var(--color-ink);
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  /* Safety net: an un-constrained flex/grid child (e.g. a horizontally
+     scrollable row without min-w-0 on its ancestors) can otherwise blow
+     out the whole page's width instead of scrolling internally. This
+     caps it at the viewport so a future instance of that bug degrades to
+     "that one row scrolls" instead of "the whole page needs zooming out". */
+  overflow-x: hidden;
 }
 
 * {

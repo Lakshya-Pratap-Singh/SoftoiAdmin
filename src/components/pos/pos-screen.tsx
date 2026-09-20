@@ -133,9 +133,9 @@ export function PosScreen({
   );
 
   return (
-    <div className="grid gap-4 lg:h-[calc(100vh-8rem)] lg:grid-cols-[1fr_380px]">
+    <div className="grid min-w-0 gap-4 lg:h-[calc(100vh-8rem)] lg:grid-cols-[1fr_380px]">
       {/* Product area */}
-      <div className="flex min-h-0 flex-col pb-20 lg:pb-0">
+      <div className="flex min-h-0 min-w-0 flex-col pb-20 lg:pb-0">
         <div className="relative mb-3">
           <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint" />
           <input
@@ -148,7 +148,7 @@ export function PosScreen({
         </div>
 
         {categories.length > 0 && (
-          <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+          <div className="mb-3 flex min-w-0 gap-2 overflow-x-auto pb-1">
             <button
               type="button"
               onClick={() => setCategoryId(null)}
