@@ -17,9 +17,14 @@ export default async function NewProductPage() {
     prisma.product.findMany({
       where: { status: "ACTIVE", productType: { in: ["RAW_MATERIAL", "COMPONENT"] } },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, productType: true },
+      select: { id: true, name: true, productType: true, costPrice: true },
     }),
   ]);
+
+  const componentOptionsForClient = componentOptions.map((c) => ({
+    ...c,
+    costPrice: c.costPrice?.toString() ?? null,
+  }));
 
   return (
     <div>
@@ -28,7 +33,7 @@ export default async function NewProductPage() {
         action={createProduct}
         categories={categories}
         artisans={artisans}
-        componentOptions={componentOptions}
+        componentOptions={componentOptionsForClient}
         mode="create"
       />
     </div>

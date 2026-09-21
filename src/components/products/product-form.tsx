@@ -9,7 +9,7 @@ import type { ActionState } from "@/lib/actions/categories";
 
 type Category = { id: string; name: string };
 type Artisan = { id: string; name: string; code: string };
-type ComponentOption = { id: string; name: string; productType: string };
+type ComponentOption = { id: string; name: string; productType: string; costPrice: string | null };
 
 export function ProductForm({
   action,
@@ -42,6 +42,19 @@ export function ProductForm({
   const [state, formAction] = useActionState(action, undefined);
   const [imageUrl, setImageUrl] = useState(defaults?.imageUrl ?? "");
   const [productType, setProductType] = useState(defaults?.productType ?? "FINISHED_PRODUCT");
+  const [costPrice, setCostPrice] = useState(defaults?.costPrice ?? "");
+  const [costPriceTouched, setCostPriceTouched] = useState(false);
+  const [bomTotal, setBomTotal] = useState<number | null>(null);
+
+  // Bill of Materials tells us the recipe's total cost — keep Cost Price
+  // synced to it automatically, but stop overwriting the moment the person
+  // types into the field themselves so a manual override always sticks.
+  function handleBomTotalChange(total: number) {
+    setBomTotal(total);
+    if (!costPriceTouched && total > 0) {
+      setCostPrice(total.toFixed(2));
+    }
+  }
 
   return (
     <form action={formAction} className="flex flex-col gap-8">
@@ -132,15 +145,52 @@ export function ProductForm({
           <p className="mb-4 text-sm text-ink-muted">
             What this product is made from — e.g. a bouquet made of stems, wrap, and ribbon.
           </p>
-          <BillOfMaterialsEditor componentOptions={componentOptions} defaultRows={defaults?.bomRows} />
+          <BillOfMaterialsEditor
+            componentOptions={componentOptions}
+            defaultRows={defaults?.bomRows}
+            onTotalCostChange={handleBomTotalChange}
+          />
         </section>
       )}
 
       <section className="rounded-lg border border-border bg-surface p-6">
         <h2 className="mb-4 text-[15px] font-medium text-ink">Pricing</h2>
         <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Cost price (₹)" htmlFor="costPrice">
-            <TextInput id="costPrice" name="costPrice" type="number" step="0.01" min={0} defaultValue={defaults?.costPrice} />
+          <Field
+            label="Cost price (₹)"
+            htmlFor="costPrice"
+            hint={
+              productType === "FINISHED_PRODUCT" && bomTotal !== null && bomTotal > 0
+                ? costPriceTouched
+                  ? `Recipe cost is ₹${bomTotal.toFixed(2)} — click to use it`
+                  : "Auto-filled from the recipe below — edit anytime to override"
+                : undefined
+            }
+          >
+            <TextInput
+              id="costPrice"
+              name="costPrice"
+              type="number"
+              step="0.01"
+              min={0}
+              value={costPrice}
+              onChange={(e) => {
+                setCostPrice(e.target.value);
+                setCostPriceTouched(true);
+              }}
+            />
+            {productType === "FINISHED_PRODUCT" && costPriceTouched && bomTotal !== null && bomTotal > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setCostPrice(bomTotal.toFixed(2));
+                  setCostPriceTouched(false);
+                }}
+                className="mt-1 text-xs font-medium text-brand hover:underline"
+              >
+                Use calculated (₹{bomTotal.toFixed(2)})
+              </button>
+            )}
           </Field>
           <Field label="Selling price (₹)" htmlFor="sellingPrice">
             <TextInput id="sellingPrice" name="sellingPrice" type="number" step="0.01" min={0} defaultValue={defaults?.sellingPrice} />

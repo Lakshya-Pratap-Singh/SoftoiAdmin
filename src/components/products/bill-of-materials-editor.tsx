@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, X, Search, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type ComponentOption = { id: string; name: string; productType: string };
+type ComponentOption = { id: string; name: string; productType: string; costPrice: string | null };
 type BomRow = { key: string; componentProductId: string; quantity: string };
 
 const TYPE_LABEL: Record<string, string> = {
@@ -92,15 +92,32 @@ function ComponentPicker({
 export function BillOfMaterialsEditor({
   componentOptions,
   defaultRows,
+  onTotalCostChange,
 }: {
   componentOptions: ComponentOption[];
   defaultRows?: { componentProductId: string; quantity: string }[];
+  onTotalCostChange?: (total: number) => void;
 }) {
   const [rows, setRows] = useState<BomRow[]>(() =>
     defaultRows && defaultRows.length > 0
       ? defaultRows.map((r) => newRow(r.componentProductId, r.quantity))
       : [newRow()]
   );
+
+  // Recompute the recipe's total cost (sum of each component's cost price
+  // × the quantity used) whenever a row's component or quantity changes,
+  // and hand it up to the product form so Cost Price can auto-fill.
+  useEffect(() => {
+    if (!onTotalCostChange) return;
+    const total = rows.reduce((sum, row) => {
+      const component = componentOptions.find((c) => c.id === row.componentProductId);
+      const qty = Number(row.quantity);
+      if (!component || !component.costPrice || !Number.isFinite(qty)) return sum;
+      return sum + Number(component.costPrice) * qty;
+    }, 0);
+    onTotalCostChange(total);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, componentOptions]);
 
   function updateRow(key: string, patch: Partial<BomRow>) {
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));

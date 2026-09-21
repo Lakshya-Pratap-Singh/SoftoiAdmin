@@ -21,7 +21,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
         NOT: { id },
       },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, productType: true },
+      select: { id: true, name: true, productType: true, costPrice: true },
     }),
     prisma.productComponent.findMany({
       where: { finishedProductId: id },
@@ -31,6 +31,10 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
   if (!product) notFound();
 
   const boundAction = updateProduct.bind(null, id);
+  const componentOptionsForClient = componentOptions.map((c) => ({
+    ...c,
+    costPrice: c.costPrice?.toString() ?? null,
+  }));
 
   return (
     <div>
@@ -39,7 +43,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
         action={boundAction}
         categories={categories}
         artisans={artisans}
-        componentOptions={componentOptions}
+        componentOptions={componentOptionsForClient}
         mode="edit"
         defaults={{
           name: product.name,
