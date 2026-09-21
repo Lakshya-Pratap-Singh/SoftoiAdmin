@@ -13,6 +13,7 @@ type ArtisanFormProps = {
     name?: string;
     type?: string;
     phone?: string;
+    whatsappNumber?: string;
     notes?: string;
   };
 };
@@ -39,6 +40,19 @@ export function ArtisanForm({ action, mode, defaults }: ArtisanFormProps) {
       </Field>
       <Field label="Phone" htmlFor="phone">
         <TextInput id="phone" name="phone" type="tel" defaultValue={defaults?.phone} placeholder="Optional" />
+      </Field>
+      <Field
+        label="WhatsApp number"
+        htmlFor="whatsappNumber"
+        hint="Where customers' thank-you messages go (Artisan Appreciation QR). Leave empty to use the phone number above."
+      >
+        <TextInput
+          id="whatsappNumber"
+          name="whatsappNumber"
+          type="tel"
+          defaultValue={defaults?.whatsappNumber}
+          placeholder="+91 98765 43210"
+        />
       </Field>
       <Field label="Notes" htmlFor="notes">
         <Textarea id="notes" name="notes" rows={3} defaultValue={defaults?.notes} />

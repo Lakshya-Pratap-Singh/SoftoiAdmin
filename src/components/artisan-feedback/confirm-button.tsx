@@ -1,0 +1,25 @@
+"use client";
+
+// Submit button that asks "are you sure?" first — for actions that can't be
+// undone (disable, regenerate). Cancelling leaves the form unsubmitted.
+export function ConfirmSubmitButton({
+  message,
+  className,
+  children,
+}: {
+  message: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="submit"
+      className={className}
+      onClick={(e) => {
+        if (!window.confirm(message)) e.preventDefault();
+      }}
+    >
+      {children}
+    </button>
+  );
+}

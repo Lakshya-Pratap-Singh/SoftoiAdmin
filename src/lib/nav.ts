@@ -15,6 +15,7 @@ import {
   Store,
   Users,
   Settings,
+  QrCode,
 } from "lucide-react";
 
 export type NavItem = {
@@ -64,6 +65,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: "Stalls & Events", href: "/stalls", icon: Store },
       { label: "Customers", href: "/customers", icon: Users },
+      { label: "Artisan Appreciation", href: "/artisan-appreciation", icon: QrCode },
     ],
   },
   {

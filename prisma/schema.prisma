@@ -94,6 +94,12 @@ enum PaymentMethod {
   OTHER
 }
 
+enum FeedbackQRStatus {
+  ACTIVE
+  DISABLED
+  EXPIRED // reserved — nothing sets this yet (no expiry rule defined)
+}
+
 // ---------------------------------------------------------------------------
 // USERS
 // ---------------------------------------------------------------------------
@@ -109,6 +115,7 @@ model User {
 
   stockMovements StockMovement[] @relation("StockMovementCreatedBy")
   orders         Order[]         @relation("OrderCreatedBy")
+  feedbackQRs    ArtisanFeedbackQR[] @relation("FeedbackQRCreatedBy")
 
   @@map("users")
 }
@@ -146,12 +153,16 @@ model Artisan {
   name      String
   type      ArtisanType
   phone     String?
+  // Stored normalised as E.164 (e.g. +919876543210). Used for the
+  // "Artisan Appreciation" WhatsApp link; if empty, `phone` is used instead.
+  whatsappNumber String?
   notes     String?
   status    RecordStatus @default(ACTIVE)
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
-  products Product[]
+  products    Product[]
+  feedbackQRs ArtisanFeedbackQR[]
 
   @@map("artisans")
 }
@@ -193,6 +204,8 @@ model Product {
   componentsUsed ProductComponent[] @relation("FinishedProductComponents")
   // The reverse: other finished products that use this product as a component
   usedInProducts ProductComponent[] @relation("ComponentUsedIn")
+
+  feedbackQRs ArtisanFeedbackQR[]
 
   @@index([categoryId])
   @@index([status])
@@ -326,7 +339,8 @@ model Order {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
-  items OrderItem[]
+  items       OrderItem[]
+  feedbackQRs ArtisanFeedbackQR[]
 
   @@index([salesChannel])
   @@index([status])
@@ -354,9 +368,72 @@ model OrderItem {
 
   createdAt          DateTime @default(now())
 
+  feedbackQRs        ArtisanFeedbackQR[]
+
   @@index([orderId])
   @@index([productId])
   @@map("order_items")
+}
+
+// ---------------------------------------------------------------------------
+// ARTISAN APPRECIATION QR — one row per printed QR code
+// ---------------------------------------------------------------------------
+// The QR encodes only https://<APP_BASE_URL>/feedback/<token>. The token is a
+// random, unguessable string; everything else (product, artisan, WhatsApp
+// number) is resolved server-side, so mappings can be changed or the QR
+// disabled without reprinting anything.
+//
+// orderId / orderItemId are optional so the same table can later hold QRs that
+// are not tied to an order (campaign / event QRs).
+// productId / artisanId are snapshotted at generation time: reassigning a
+// product to another artisan later does not silently redirect QRs already
+// printed and shipped.
+//
+// Counters are honest, not aspirational: scanCount = page opened,
+// whatsappOpenCount = customer tapped the WhatsApp button. Whether the message
+// was actually SENT cannot be known with a wa.me link, so it is not tracked.
+
+model ArtisanFeedbackQR {
+  id                 String           @id @default(cuid())
+  token              String           @unique
+
+  orderId            String?
+  order              Order?           @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  orderItemId        String?
+  orderItem          OrderItem?       @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  productId          String
+  product            Product          @relation(fields: [productId], references: [id])
+  artisanId          String
+  artisan            Artisan          @relation(fields: [artisanId], references: [id])
+
+  status             FeedbackQRStatus @default(ACTIVE)
+
+  scanCount          Int              @default(0)
+  firstScannedAt     DateTime?
+  lastScannedAt      DateTime?
+  whatsappOpenCount  Int              @default(0)
+  lastWhatsappOpenAt DateTime?
+
+  // Set on the NEW row when an admin regenerates a lost/damaged QR; the old
+  // row is disabled so its token stops working.
+  regeneratedFromId  String?
+  regeneratedFrom    ArtisanFeedbackQR?  @relation("FeedbackQRRegeneration", fields: [regeneratedFromId], references: [id], onDelete: SetNull)
+  regeneratedTo      ArtisanFeedbackQR[] @relation("FeedbackQRRegeneration")
+
+  createdById        String?
+  createdBy          User?            @relation("FeedbackQRCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  disabledAt         DateTime?
+
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([orderId])
+  @@index([orderItemId, status])
+  @@index([productId])
+  @@index([artisanId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("artisan_feedback_qrs")
 }
 
 // ---------------------------------------------------------------------------

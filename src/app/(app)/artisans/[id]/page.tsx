@@ -102,6 +102,7 @@ export default async function ArtisanDetailPage({ params }: { params: Promise<{ 
       <div className="mb-4 flex items-center gap-2">
         <StatusBadge label={artisan.status === "ACTIVE" ? "Active" : "Archived"} tone={artisan.status === "ACTIVE" ? "good" : "neutral"} />
         {artisan.phone && <span className="text-sm text-ink-muted">{artisan.phone}</span>}
+        {artisan.whatsappNumber && <span className="text-sm text-ink-muted">WhatsApp {artisan.whatsappNumber}</span>}
       </div>
 
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">

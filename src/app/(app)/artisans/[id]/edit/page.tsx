@@ -22,6 +22,7 @@ export default async function EditArtisanPage({ params }: { params: Promise<{ id
             name: artisan.name,
             type: artisan.type,
             phone: artisan.phone ?? undefined,
+            whatsappNumber: artisan.whatsappNumber ?? undefined,
             notes: artisan.notes ?? undefined,
           }}
         />

@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { formatCurrency } from "@/lib/utils";
 import { cancelOrder } from "@/lib/actions/orders";
+import { OrderQRPanel } from "@/components/artisan-feedback/order-qr-panel";
 
 const STATUS_TONE = {
   DRAFT: "neutral",
@@ -131,6 +132,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             )}
           </dl>
         </div>
+      </div>
+
+      <div className="mt-4">
+        <OrderQRPanel orderId={order.id} />
       </div>
     </div>
   );
