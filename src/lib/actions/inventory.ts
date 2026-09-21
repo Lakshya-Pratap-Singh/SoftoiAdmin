@@ -32,6 +32,43 @@ export async function stockIn(_prevState: ActionState, formData: FormData): Prom
   const previousQuantity = product.currentStock;
   const newQuantity = previousQuantity + quantity;
 
+  // If this is a finished product with a Bill of Materials, producing more
+  // of it consumes its components proportionally (e.g. stocking in 4
+  // bouquets that each use 0.5 of a wrap sheet consumes 2 sheets).
+  // currentStock is a whole-number column, so a component's consumption is
+  // rounded to the nearest whole unit — fractional BOM quantities (0.5,
+  // 0.75) combine correctly across a batch, but a single unit whose BOM
+  // usage isn't a whole number will round rather than track the exact
+  // fractional remainder.
+  const bom =
+    product.productType === "FINISHED_PRODUCT"
+      ? await prisma.productComponent.findMany({
+          where: { finishedProductId: productId },
+          include: { componentProduct: { select: { id: true, name: true, currentStock: true } } },
+        })
+      : [];
+
+  const settings = await prisma.settings.findFirst();
+  const allowNegative = settings?.allowNegativeStock ?? false;
+
+  const consumption = bom
+    .map((row) => ({
+      componentId: row.componentProductId,
+      componentName: row.componentProduct.name,
+      currentStock: row.componentProduct.currentStock,
+      consumed: Math.round(Number(row.quantity) * quantity),
+    }))
+    .filter((row) => row.consumed > 0);
+
+  if (!allowNegative) {
+    const short = consumption.find((row) => row.consumed > row.currentStock);
+    if (short) {
+      return {
+        error: `Not enough "${short.componentName}" in stock — need ${short.consumed}, only ${short.currentStock} available.`,
+      };
+    }
+  }
+
   await prisma.$transaction([
     prisma.product.update({
       where: { id: productId },
@@ -48,9 +85,28 @@ export async function stockIn(_prevState: ActionState, formData: FormData): Prom
         notes: notes || null,
       },
     }),
+    ...consumption.flatMap((row) => [
+      prisma.product.update({
+        where: { id: row.componentId },
+        data: { currentStock: row.currentStock - row.consumed },
+      }),
+      prisma.stockMovement.create({
+        data: {
+          productId: row.componentId,
+          movementType: "COMPONENT_CONSUMED",
+          quantity: -row.consumed,
+          previousQuantity: row.currentStock,
+          newQuantity: row.currentStock - row.consumed,
+          reason: `Used to produce ${quantity} × ${product.name}`,
+          referenceType: "PRODUCT",
+          referenceId: productId,
+        },
+      }),
+    ]),
   ]);
 
   revalidateStockPaths(productId);
+  consumption.forEach((row) => revalidateStockPaths(row.componentId));
   redirect("/inventory/stock-history");
 }
 

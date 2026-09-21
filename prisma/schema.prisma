@@ -52,6 +52,7 @@ enum StockMovementType {
   ONLINE_ORDER
   ORDER_CANCELLATION
   STOCK_RESTORATION
+  COMPONENT_CONSUMED // component stock used up producing a finished product via its Bill of Materials
 }
 
 enum StallStatus {
