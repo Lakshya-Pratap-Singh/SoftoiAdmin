@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { History } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui/card";
@@ -13,6 +14,7 @@ const MOVEMENT_TYPES = [
   "ONLINE_ORDER",
   "ORDER_CANCELLATION",
   "STOCK_RESTORATION",
+  "COMPONENT_CONSUMED",
 ] as const;
 
 function movementLabel(type: string) {
@@ -55,8 +57,23 @@ export default async function StockHistoryPage({
     },
     orderBy: { movementDate: "desc" },
     take: 200,
-    include: { product: { select: { name: true } }, createdBy: { select: { name: true } } },
+    include: {
+      product: {
+        select: { name: true, sku: true, productCode: true, category: { select: { name: true } } },
+      },
+      createdBy: { select: { name: true } },
+    },
   });
+
+  // referenceId is a loose reference (no FK), so resolve it to a real
+  // order number with a separate lookup rather than a Prisma include.
+  const orderIds = Array.from(
+    new Set(movements.filter((m) => m.referenceType === "ORDER" && m.referenceId).map((m) => m.referenceId as string))
+  );
+  const orders = orderIds.length
+    ? await prisma.order.findMany({ where: { id: { in: orderIds } }, select: { id: true, orderNumber: true } })
+    : [];
+  const orderNumberById = new Map(orders.map((o) => [o.id, o.orderNumber]));
 
   return (
     <div>
@@ -65,13 +82,17 @@ export default async function StockHistoryPage({
         description="A complete, permanent record of every stock movement."
         actions={<SpreadsheetExportButtons filename="stock-history" rows={movements.map((movement) => ({
           Date: movement.movementDate.toISOString(),
+          "Product Code": movement.product.productCode,
           Product: movement.product.name,
+          SKU: movement.product.sku ?? "",
+          Category: movement.product.category?.name ?? "",
           Type: movementLabel(movement.movementType),
           Quantity: movement.quantity,
           "Previous Quantity": movement.previousQuantity,
           "New Quantity": movement.newQuantity,
+          "Order Number": movement.referenceType === "ORDER" ? orderNumberById.get(movement.referenceId ?? "") ?? "" : "",
           Reason: movement.reason,
-          Notes: movement.notes,
+          Notes: movement.notes ?? "",
           "Created By": movement.createdBy?.name ?? "",
         }))} />}
       />
@@ -132,36 +153,49 @@ export default async function StockHistoryPage({
                 <th className="px-4 py-3 font-medium">Type</th>
                 <th className="px-4 py-3 font-medium">Quantity</th>
                 <th className="px-4 py-3 font-medium">Prev → New</th>
+                <th className="px-4 py-3 font-medium">Order</th>
                 <th className="px-4 py-3 font-medium">Reason</th>
                 <th className="px-4 py-3 font-medium">User</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {movements.map((m) => (
-                <tr key={m.id}>
-                  <td className="whitespace-nowrap px-4 py-3 text-ink-muted">
-                    {m.movementDate.toLocaleString("en-IN", {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    })}
-                  </td>
-                  <td className="px-4 py-3 font-medium text-ink">{m.product.name}</td>
-                  <td className="px-4 py-3 text-ink-muted">{movementLabel(m.movementType)}</td>
-                  <td
-                    className={`px-4 py-3 font-medium ${
-                      m.quantity > 0 ? "text-good" : m.quantity < 0 ? "text-bad" : "text-ink-muted"
-                    }`}
-                  >
-                    {m.quantity > 0 ? "+" : ""}
-                    {m.quantity}
-                  </td>
-                  <td className="px-4 py-3 text-ink-muted">
-                    {m.previousQuantity} → {m.newQuantity}
-                  </td>
-                  <td className="px-4 py-3 text-ink-muted">{m.reason}</td>
-                  <td className="px-4 py-3 text-ink-muted">{m.createdBy?.name || "—"}</td>
-                </tr>
-              ))}
+              {movements.map((m) => {
+                const orderNumber = m.referenceType === "ORDER" ? orderNumberById.get(m.referenceId ?? "") : undefined;
+                return (
+                  <tr key={m.id}>
+                    <td className="whitespace-nowrap px-4 py-3 text-ink-muted">
+                      {m.movementDate.toLocaleString("en-IN", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })}
+                    </td>
+                    <td className="px-4 py-3 font-medium text-ink">{m.product.name}</td>
+                    <td className="px-4 py-3 text-ink-muted">{movementLabel(m.movementType)}</td>
+                    <td
+                      className={`px-4 py-3 font-medium ${
+                        m.quantity > 0 ? "text-good" : m.quantity < 0 ? "text-bad" : "text-ink-muted"
+                      }`}
+                    >
+                      {m.quantity > 0 ? "+" : ""}
+                      {m.quantity}
+                    </td>
+                    <td className="px-4 py-3 text-ink-muted">
+                      {m.previousQuantity} → {m.newQuantity}
+                    </td>
+                    <td className="px-4 py-3">
+                      {orderNumber ? (
+                        <Link href={`/orders/${m.referenceId}`} className="text-brand hover:underline">
+                          {orderNumber}
+                        </Link>
+                      ) : (
+                        <span className="text-ink-faint">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-ink-muted">{m.reason}</td>
+                    <td className="px-4 py-3 text-ink-muted">{m.createdBy?.name || "—"}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
