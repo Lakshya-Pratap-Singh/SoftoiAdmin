@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { StatCard } from "@/components/ui/stat-card";
+import { SpreadsheetExportButtons } from "@/components/ui/spreadsheet-export-buttons";
 import { formatCurrency } from "@/lib/utils";
 import { ARTISAN_TYPE_LABEL } from "@/lib/artisan-type";
 import { archiveArtisan, restoreArtisan } from "@/lib/actions/artisans";
@@ -33,12 +34,28 @@ export default async function ArtisansPage() {
         title="Artisans"
         description="Profiles for every creator making your products, with what's assigned to them."
         actions={
-          <Link
-            href="/artisans/new"
-            className="flex items-center gap-2 rounded-md bg-brand px-4 py-2.5 text-sm font-medium text-white hover:opacity-90"
-          >
-            <Plus size={16} /> Add Artisan
-          </Link>
+          <div className="flex items-center gap-2">
+            <SpreadsheetExportButtons
+              filename="artisans"
+              rows={artisans.map((a) => ({
+                "Artisan ID (PK)": a.id,
+                Code: a.code,
+                Name: a.name,
+                Type: ARTISAN_TYPE_LABEL[a.type] ?? a.type,
+                Phone: a.phone ?? "",
+                Notes: a.notes ?? "",
+                Status: a.status === "ACTIVE" ? "Active" : "Archived",
+                "Products Assigned": a._count.products,
+                "Created At": a.createdAt.toISOString(),
+              }))}
+            />
+            <Link
+              href="/artisans/new"
+              className="flex items-center gap-2 rounded-md bg-brand px-4 py-2.5 text-sm font-medium text-white hover:opacity-90"
+            >
+              <Plus size={16} /> Add Artisan
+            </Link>
+          </div>
         }
       />
 

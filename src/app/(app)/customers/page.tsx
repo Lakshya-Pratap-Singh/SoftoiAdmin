@@ -3,6 +3,7 @@ import { Plus, Users } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { SpreadsheetExportButtons } from "@/components/ui/spreadsheet-export-buttons";
 
 export default async function CustomersPage() {
   const customers = await prisma.customer.findMany({
@@ -16,12 +17,26 @@ export default async function CustomersPage() {
         title="Customers"
         description="Basic customer records linked to orders."
         actions={
-          <Link
-            href="/customers/new"
-            className="flex items-center gap-2 rounded-md bg-brand px-4 py-2.5 text-sm font-medium text-white hover:opacity-90"
-          >
-            <Plus size={16} /> Add Customer
-          </Link>
+          <div className="flex items-center gap-2">
+            <SpreadsheetExportButtons
+              filename="customers"
+              rows={customers.map((c) => ({
+                "Customer ID (PK)": c.id,
+                Name: c.name,
+                Phone: c.phone ?? "",
+                Email: c.email ?? "",
+                Notes: c.notes ?? "",
+                "Order Count": c._count.orders,
+                "Created At": c.createdAt.toISOString(),
+              }))}
+            />
+            <Link
+              href="/customers/new"
+              className="flex items-center gap-2 rounded-md bg-brand px-4 py-2.5 text-sm font-medium text-white hover:opacity-90"
+            >
+              <Plus size={16} /> Add Customer
+            </Link>
+          </div>
         }
       />
 

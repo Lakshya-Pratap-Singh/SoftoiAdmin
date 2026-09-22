@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { SpreadsheetExportButtons } from "@/components/ui/spreadsheet-export-buttons";
 
 const STATUS_TONE = {
   UPCOMING: "neutral",
@@ -24,12 +25,31 @@ export default async function StallsPage() {
         title="Stalls & Events"
         description="Track physical selling locations — malls, exhibitions, and pop-ups."
         actions={
-          <Link
-            href="/stalls/new"
-            className="flex items-center gap-2 rounded-md bg-brand px-4 py-2.5 text-sm font-medium text-white hover:opacity-90"
-          >
-            <Plus size={16} /> Add Stall
-          </Link>
+          <div className="flex items-center gap-2">
+            <SpreadsheetExportButtons
+              filename="stalls"
+              rows={stalls.map((s) => ({
+                "Stall ID (PK)": s.id,
+                "Stall Code": s.stallCode,
+                Name: s.name,
+                Location: s.location ?? "",
+                "Mall Name": s.mallName ?? "",
+                "Event Name": s.eventName ?? "",
+                "Start Date": s.startDate ? s.startDate.toISOString() : "",
+                "End Date": s.endDate ? s.endDate.toISOString() : "",
+                Status: s.status,
+                Notes: s.notes ?? "",
+                "Order Count": s._count.orders,
+                "Created At": s.createdAt.toISOString(),
+              }))}
+            />
+            <Link
+              href="/stalls/new"
+              className="flex items-center gap-2 rounded-md bg-brand px-4 py-2.5 text-sm font-medium text-white hover:opacity-90"
+            >
+              <Plus size={16} /> Add Stall
+            </Link>
+          </div>
         }
       />
 

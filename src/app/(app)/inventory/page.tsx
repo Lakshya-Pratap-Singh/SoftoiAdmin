@@ -46,10 +46,13 @@ export default async function InventoryPage({
         title="Inventory"
         description="A central view of current stock across every product."
         actions={<SpreadsheetExportButtons filename="inventory" rows={products.map((product) => ({
+          "Product ID (PK)": product.id,
           "Product Code": product.productCode,
           "Product Name": product.name,
           SKU: product.sku ?? "",
+          "Category ID (FK)": product.categoryId ?? "",
           Category: product.category?.name ?? "",
+          "Artisan ID (FK)": product.artisanId ?? "",
           "Product Type": typeLabel(product.productType),
           Description: product.description ?? "",
           "Cost Price": product.costPrice?.toString() ?? "",

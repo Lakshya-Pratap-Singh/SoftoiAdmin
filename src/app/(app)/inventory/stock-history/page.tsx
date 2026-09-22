@@ -81,7 +81,9 @@ export default async function StockHistoryPage({
         title="Stock History"
         description="A complete, permanent record of every stock movement."
         actions={<SpreadsheetExportButtons filename="stock-history" rows={movements.map((movement) => ({
+          "Movement ID (PK)": movement.id,
           Date: movement.movementDate.toISOString(),
+          "Product ID (FK)": movement.productId,
           "Product Code": movement.product.productCode,
           Product: movement.product.name,
           SKU: movement.product.sku ?? "",
@@ -90,9 +92,11 @@ export default async function StockHistoryPage({
           Quantity: movement.quantity,
           "Previous Quantity": movement.previousQuantity,
           "New Quantity": movement.newQuantity,
+          "Order ID (FK)": movement.referenceType === "ORDER" ? movement.referenceId ?? "" : "",
           "Order Number": movement.referenceType === "ORDER" ? orderNumberById.get(movement.referenceId ?? "") ?? "" : "",
           Reason: movement.reason,
           Notes: movement.notes ?? "",
+          "Created By ID (FK)": movement.createdById ?? "",
           "Created By": movement.createdBy?.name ?? "",
         }))} />}
       />

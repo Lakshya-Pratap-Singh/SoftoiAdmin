@@ -46,6 +46,7 @@ export default async function ProductPerformancePage({
           sku: true,
           imageUrl: true,
           currentStock: true,
+          categoryId: true,
           category: { select: { name: true } },
           artisan: { select: { id: true, name: true, code: true } },
         },
@@ -80,10 +81,13 @@ export default async function ProductPerformancePage({
             filename="product-performance"
             rows={ranked.map((r, i) => ({
               Rank: i + 1,
+              "Product ID (PK)": r.product.id,
               "Product Code": r.product.productCode,
               "Product Name": r.product.name,
               SKU: r.product.sku ?? "",
+              "Category ID (FK)": r.product.categoryId ?? "",
               Category: r.product.category?.name ?? "",
+              "Artisan ID (FK)": r.product.artisan?.id ?? "",
               Artisan: r.product.artisan ? `${r.product.artisan.name} (${r.product.artisan.code})` : "",
               "Units Sold": r.unitsSold,
               Revenue: r.revenue,

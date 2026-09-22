@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { SpreadsheetExportButtons } from "@/components/ui/spreadsheet-export-buttons";
 import { formatCurrency } from "@/lib/utils";
 
 const STATUS_TONE = {
@@ -36,7 +37,32 @@ export default async function OrdersPage({
 
   return (
     <div>
-      <PageHeader title="Orders" description="Every order across all sales channels, in one place." />
+      <PageHeader
+        title="Orders"
+        description="Every order across all sales channels, in one place."
+        actions={
+          <SpreadsheetExportButtons
+            filename="orders"
+            rows={orders.map((o) => ({
+              "Order ID (PK)": o.id,
+              "Order Number": o.orderNumber,
+              "Customer ID (FK)": o.customerId ?? "",
+              Customer: o.customer?.name ?? "",
+              "Stall ID (FK)": o.stallId ?? "",
+              Stall: o.stall?.name ?? "",
+              "Created By ID (FK)": o.createdById ?? "",
+              Channel: label(o.salesChannel),
+              Status: label(o.status),
+              "Payment Status": label(o.paymentStatus),
+              "Payment Method": o.paymentMethod ? label(o.paymentMethod) : "",
+              Subtotal: o.subtotal.toString(),
+              Discount: o.discount.toString(),
+              Total: o.total.toString(),
+              "Order Date": o.orderDate.toISOString(),
+            }))}
+          />
+        }
+      />
 
       <form className="mb-4 flex flex-wrap gap-2">
         <select

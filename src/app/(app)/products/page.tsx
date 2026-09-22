@@ -80,10 +80,13 @@ export default async function ProductsPage({
             <SpreadsheetExportButtons
               filename="products"
               rows={filtered.map((product) => ({
+                "Product ID (PK)": product.id,
                 "Product Code": product.productCode,
                 "Product Name": product.name,
                 SKU: product.sku ?? "",
+                "Category ID (FK)": product.categoryId ?? "",
                 Category: product.category?.name ?? "",
+                "Artisan ID (FK)": product.artisanId ?? "",
                 "Product Type": typeLabel(product.productType),
                 Description: product.description ?? "",
                 "Cost Price": product.costPrice?.toString() ?? "",

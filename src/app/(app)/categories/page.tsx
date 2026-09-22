@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { SpreadsheetExportButtons } from "@/components/ui/spreadsheet-export-buttons";
 import { archiveCategory, restoreCategory } from "@/lib/actions/categories";
 
 export default async function CategoriesPage() {
@@ -18,12 +19,25 @@ export default async function CategoriesPage() {
         title="Categories"
         description="Organize products into groups like Keychains or Hair Accessories."
         actions={
-          <Link
-            href="/categories/new"
-            className="flex items-center gap-2 rounded-md bg-brand px-4 py-2.5 text-sm font-medium text-white hover:opacity-90"
-          >
-            <Plus size={16} /> Add Category
-          </Link>
+          <div className="flex items-center gap-2">
+            <SpreadsheetExportButtons
+              filename="categories"
+              rows={categories.map((c) => ({
+                "Category ID (PK)": c.id,
+                Name: c.name,
+                Description: c.description ?? "",
+                Status: c.status === "ACTIVE" ? "Active" : "Archived",
+                "Product Count": c._count.products,
+                "Created At": c.createdAt.toISOString(),
+              }))}
+            />
+            <Link
+              href="/categories/new"
+              className="flex items-center gap-2 rounded-md bg-brand px-4 py-2.5 text-sm font-medium text-white hover:opacity-90"
+            >
+              <Plus size={16} /> Add Category
+            </Link>
+          </div>
         }
       />
 

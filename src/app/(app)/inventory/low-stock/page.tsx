@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ProductAvatar } from "@/components/ui/product-avatar";
+import { SpreadsheetExportButtons } from "@/components/ui/spreadsheet-export-buttons";
 
 export default async function LowStockPage() {
   const products = await prisma.product.findMany({
@@ -21,6 +22,22 @@ export default async function LowStockPage() {
       <PageHeader
         title="Low Stock"
         description="Products at or below their minimum stock level."
+        actions={
+          <SpreadsheetExportButtons
+            filename="low-stock"
+            rows={lowStock.map((p) => ({
+              "Product ID (PK)": p.id,
+              "Product Code": p.productCode,
+              Name: p.name,
+              SKU: p.sku ?? "",
+              "Category ID (FK)": p.categoryId ?? "",
+              "Artisan ID (FK)": p.artisanId ?? "",
+              "Current Stock": p.currentStock,
+              "Minimum Stock": p.minimumStock,
+              Status: p.currentStock === 0 ? "Out of stock" : "Low stock",
+            }))}
+          />
+        }
       />
 
       {lowStock.length === 0 ? (
